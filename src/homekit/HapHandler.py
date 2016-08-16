@@ -387,10 +387,15 @@ class HapHandler(SimpleHTTPRequestHandler):
 		for c in data:
 			self.wfile.write(c)
 
-	def sendEncryptedResponse(self, msg, status='200 OK'):
+	def sendEncryptedResponse(self, msg, status='200 OK', contentType='application/hap+json'):
 		if type(msg) is dict:
 			msg = json.dumps(msg)
-		output = 'HTTP/1.1 %s\r\nContent-Type: application/hap+json\r\nConnection: keep-alive\r\nContent-Length: %i\r\n\r\n%s' % (status, len(msg), msg)
+		output = 'HTTP/1.1 %s\r\nContent-Type: %s\r\nConnection: keep-alive\r\nContent-Length: %i\r\n\r\n%s' % (
+			status,
+			contentType,
+			len(msg),
+			msg
+		)
 		l = len(output)
 		addData = [l&0xFF, (l>>8)&0xFF]
 		nonce = []
