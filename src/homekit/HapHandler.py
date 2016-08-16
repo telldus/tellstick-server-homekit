@@ -367,7 +367,7 @@ class HapHandler(SimpleHTTPRequestHandler):
 			self.close_connection = 0  # keepalive
 
 			p = HttpParser()
-			p.execute(raw_requestline, len(self.raw_requestline))
+			p.execute(raw_requestline, len(raw_requestline))
 			self.parsedRequest = p.recv_body()
 
 			mname = 'do_encrypted_' + self.command
