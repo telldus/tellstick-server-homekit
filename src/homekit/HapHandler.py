@@ -19,12 +19,6 @@ import tlv
 
 import logging
 
-persistData = {
-	'longTermKey': 'b8fc093873e2b9b51d6167c73ab06c326c455f6b2f8608cf1e99d8703125ee3b'
-}
-# longTermKey can be created with:
-# signingKey, verifyingKey = ed25519.create_keypair()
-# longTermKey = signingKey.to_ascii(encoding="hex")
 
 class HapHandler(SimpleHTTPRequestHandler):
 	def __init__(self, *args, **kwargs):
@@ -36,9 +30,8 @@ class HapHandler(SimpleHTTPRequestHandler):
 
 	def pairSetupStep1(self):
 		username = 'Pair-Setup'
-		password = '624-45-735'
 
-		(self.salt, verifier, bits) = srp.newVerifier(username, password, 3072)
+		(self.salt, verifier, bits) = srp.newVerifier(username, self.password, 3072)
 		self.sv = srp.Server(username, self.salt, verifier, bits)
 		self.B = long_to_bytes(self.sv.seed())
 
@@ -135,7 +128,7 @@ class HapHandler(SimpleHTTPRequestHandler):
 		h = hkdf.Hkdf(accessorySalt, S_private, hash=hashlib.sha512)
 		AccessoryX = h.expand(accessoryInfo, length=32)
 
-		signingKey = ed25519.SigningKey(persistData['longTermKey'], encoding='hex')
+		signingKey = ed25519.SigningKey(self.longTermKey, encoding='hex')
 		verifyingKey = signingKey.get_verifying_key()
 
 		AccessoryLTPK = verifyingKey.to_bytes()
@@ -176,7 +169,7 @@ class HapHandler(SimpleHTTPRequestHandler):
 	def pairVerifyStep1(self, tlvData):
 		publicKey = tlvData['public_key']['data']
 
-		AccessoryLTSK = ed25519.SigningKey(persistData['longTermKey'], encoding='hex')
+		AccessoryLTSK = ed25519.SigningKey(self.longTermKey, encoding='hex')
 		AccessoryLTPK = AccessoryLTSK.get_verifying_key()
 
 		AccessoryPairingID = HapHandler.getId()
@@ -221,7 +214,7 @@ class HapHandler(SimpleHTTPRequestHandler):
 		self.sessionStorage = {
 			'clientPublicKey': iosDevicePublicKey.serialize(),
 			'secretKey': private.serialize(),
-			'publicKey': public.serialize(),
+			'publicKey': publicSerialized,
 			'sharedSec': shared,
 			'hkdfPairEncKey': sessionKey,
 			'writeKey': writeKey,
@@ -412,6 +405,10 @@ class HapHandler(SimpleHTTPRequestHandler):
 		encryptedRequest = ''.join([chr(x) for x in r])
 		self.wfile.write(encryptedRequest)
 		self.sendCounter = self.sendCounter + 1
+
+	def setLongTermKey(self, key, password):
+		self.longTermKey = key
+		self.password = password
 
 	@staticmethod
 	def verifyAndDecrypt(key,nonce,ciphertext,mac,addData=None):
