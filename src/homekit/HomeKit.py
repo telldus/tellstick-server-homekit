@@ -22,25 +22,28 @@ class RequestHandler(HapHandler):
 		HapHandler.finish(self)
 		RequestHandler.HTTPDServer.lostConnection(self)
 
+	def addPairing(self, identifier, publicKey, permissions):
+		self.hk.addPairing(identifier, publicKey, permissions)
+		return True
+
 	def do_encrypted_GET(self):
 		logging.warning('Encrypted GET to %s', self.path)
-		hk = HomeKit(RequestHandler.HTTPDServer.context)
 		url = urlparse(self.path)
 		if url.path == '/accessories':
-			hk.handleAccessories(self)
+			self.hk.handleAccessories(self)
 		elif url.path == '/characteristics':
 			self.query = dict(parse_qsl(url.query))
-			hk.handleCharacteristicsGet(self)
+			self.hk.handleCharacteristicsGet(self)
 
 	def do_encrypted_PUT(self):
-		hk = HomeKit(RequestHandler.HTTPDServer.context)
 		if self.path == '/characteristics':
 			data = json.loads(self.parsedRequest)
-			hk.handleCharacteristicsPut(self, data)
+			self.hk.handleCharacteristicsPut(self, data)
 
 	def setup(self):
 		HapHandler.setup(self)
 		RequestHandler.HTTPDServer.newConnection(self)
+		self.hk = HomeKit(RequestHandler.HTTPDServer.context)
 
 class ThreadedTCPServer(ThreadingMixIn, TCPServer):
 	daemon_threads = True
@@ -108,6 +111,10 @@ class HomeKit(Plugin):
 		Application().queue(self.start)
 		self.accessories = {}
 		self.accessories[1] = HapBridgeAccessory()
+		s = Settings('homekit')
+		self.clients = s.get('clients', {})
+		self.longTermKey = s.get('longTermKey', None)
+		self.password = s.get('password', None)
 
 	def start(self):
 		self.port    = random.randint(8000, 8080)
@@ -118,6 +125,14 @@ class HomeKit(Plugin):
 			if not device.confirmed():
 				continue
 			self.deviceAdded(device)
+
+	def addPairing(self, identifier, publicKey, permissions):
+		self.clients[identifier] = {
+			'publicKey': publicKey,
+			'admin': permissions
+		}
+		s = Settings('homekit')
+		s['clients'] = self.clients
 
 	def handleAccessories(self, request):
 		accessories = [{'aid': i, 'services': self.accessories[i].servicesJSON()} for i in self.accessories]
@@ -172,18 +187,15 @@ class HomeKit(Plugin):
 		request.sendEncryptedResponse('', '204 No Content')
 
 	def newConnection(self, conn):
-		s = Settings('homekit')
-		longTermKey = s.get('longTermKey', None)
-		password = s.get('password', None)
-		if longTermKey is None or password is None:
+		if self.longTermKey is None or self.password is None:
 			# No public key, generate
 			signingKey, verifyingKey = ed25519.create_keypair()
-			longTermKey = signingKey.to_ascii(encoding='hex')
+			self.longTermKey = signingKey.to_ascii(encoding='hex')
 			pw = ''.join([str(random.randint(0,9)) for i in range(8)])
-			password = '%s-%s-%s' % (pw[0:3], pw[3:5], pw[5:8])
-			s['longTermKey'] = longTermKey
-			s['password'] = password
-		conn.setLongTermKey(longTermKey, password)
+			self.password = '%s-%s-%s' % (pw[0:3], pw[3:5], pw[5:8])
+			s['longTermKey'] = self.longTermKey
+			s['password'] = self.password
+		conn.setLongTermKey(self.longTermKey, self.password)
 
 	# IDeviceChange
 	def deviceAdded(self, device):

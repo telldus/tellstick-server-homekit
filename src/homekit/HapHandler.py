@@ -254,6 +254,35 @@ class HapHandler(SimpleHTTPRequestHandler):
 		self.end_headers()
 		self.output(output)
 
+	def addPairing(self, tlvData):
+		return False
+
+	def __addPairing(self, tlvData):
+		identifier = ''.join([chr(x) for x in tlvData['identifier']['data']])
+		publicKey = ''.join(['%x' % x for x in tlvData['public_key']['data']])
+		admin = tlvData['permissions']['data'][0]
+		logging.warning('Identifier %s', identifier)
+		logging.warning('PublicKey %s', publicKey)
+		logging.warning('Permissions %s', admin)
+
+		# TODO: Check admin bit
+
+		response = []
+		if self.addPairing(identifier, publicKey, admin):
+			response.append({'type': 'state', 'length': 1, 'data': 2})
+		else:
+			response.append({'type': 'state', 'length': 1, 'data': 2})
+			response.append({'type': 'error', 'length': 1, 'data': 1})
+		output = tlv.pack(response)
+
+		self.sendEncryptedResponse(output, contentType='application/pairing+tlv8')
+
+	def do_encrypted_POST(self):
+		if self.path == '/pairings':
+			tlvData = tlv.unpack(self.parsedRequest)
+			if tlvData['method']['data'][0] == 3:
+				self.__addPairing(tlvData)
+
 	def do_POST(self):
 		logging.warning('POST to %s', self.path)
 		if 'Content-Length' not in self.headers:
