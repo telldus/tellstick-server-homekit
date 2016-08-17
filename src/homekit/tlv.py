@@ -35,6 +35,10 @@ def get_tlv_id(type_name):
 def pack(input):
 	output = []
 	for package in input:
+		if package['length'] == 0:  # Used by separator
+			output += [chr(get_tlv_id(package['type']))]
+			output += [chr(0)]
+			continue
 		while package['length'] > 0:
 			if package['length'] == 1 and not isinstance(package['data'], list):
 				package['data'] = [package['data']]
