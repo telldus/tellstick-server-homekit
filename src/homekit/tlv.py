@@ -1,19 +1,20 @@
 # -*- coding: utf-8 -*-
 
 tlv_types = {
-	'auth_method': 0x00,
-	'user': 0x01,
-	'salt': 0x02,
-	'public_key': 0x03,
-	'proof': 0x04,
-	'encrypted_data': 0x05,
-	'auth_tag': 0x06,
-	'state': 0x07,
-	'status': 0x08,
-	'retry_delay': 0x09,
-	'certificate': 0x0a,
-	'mfiproof': 0x0b,
-	'admin': 0x0c,
+	'auth_method': 0x00,     # kTLVType_Method
+	'identifier': 0x01,      # kTLVType_Identifier
+	'salt': 0x02,            # kTLVType_Salt
+	'public_key': 0x03,      # kTLVType_PublicKey
+	'proof': 0x04,           # kTLVType_Proof
+	'encrypted_data': 0x05,  # kTLVType_EncryptedData
+	'state': 0x06,           # kTLVType_State
+	'error': 0x07,           # kTLVType_Error
+	'read_delay': 0x08,      # kTLVType_ReadDelay
+	'certificate': 0x09,     # kTLVType_Certificate
+	'signature': 0x0a,       # kTLVType_Signature
+	'permissions': 0x0b,     # kTLVType_Permissions
+	'fragment_data': 0x0c,   # kTLVType_FragmentData
+	'separator': 0xFF        # kTLVType_Separator
 }
 
 tlv_status = {

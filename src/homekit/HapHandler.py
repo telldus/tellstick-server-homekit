@@ -36,7 +36,7 @@ class HapHandler(SimpleHTTPRequestHandler):
 		self.B = long_to_bytes(self.sv.seed())
 
 		response = []
-		response.append({'type': 'auth_tag', 'length': 1, 'data': 2})
+		response.append({'type': 'state', 'length': 1, 'data': 2})
 		response.append({'type': 'public_key', 'length': len(self.B), 'data': self.B})
 		response.append({'type': 'salt', 'length': len(self.salt), 'data': self.salt})
 		output = tlv.pack(response)
@@ -56,7 +56,7 @@ class HapHandler(SimpleHTTPRequestHandler):
 		serverProof = self.sv.proof(bytes_to_long(publicKey), proof)
 
 		response = []
-		response.append({'type': 'auth_tag', 'length': 1, 'data': 4})
+		response.append({'type': 'state', 'length': 1, 'data': 4})
 		response.append({'type': 'proof', 'length': len(serverProof), 'data': serverProof})
 		output = tlv.pack(response)
 
@@ -90,9 +90,9 @@ class HapHandler(SimpleHTTPRequestHandler):
 
 		unpackedTLV = tlv.unpack(plainText) #ok
 
-		clientUsername = ''.join([chr(x) for x in unpackedTLV['user']['data']])
+		clientUsername = ''.join([chr(x) for x in unpackedTLV['identifier']['data']])
 		clientLTPK = ''.join([chr(x) for x in unpackedTLV['public_key']['data']])
-		clientProof = ''.join([chr(x) for x in unpackedTLV['certificate']['data']])
+		clientProof = ''.join([chr(x) for x in unpackedTLV['signature']['data']])
 
 		hkdfEncKey = outputKey
 		self.pairSetupStep4(clientUsername, clientLTPK, clientProof)
@@ -140,9 +140,9 @@ class HapHandler(SimpleHTTPRequestHandler):
 		AccessorySignature = signingKey.sign(material)
 
 		response = []
-		response.append({'type': 'user', 'length': len(AccessoryPairingID), 'data': AccessoryPairingID})
+		response.append({'type': 'identifier', 'length': len(AccessoryPairingID), 'data': AccessoryPairingID})
 		response.append({'type': 'public_key', 'length': len(AccessoryLTPK), 'data': AccessoryLTPK})
-		response.append({'type': 'certificate', 'length': len(AccessorySignature), 'data': AccessorySignature})
+		response.append({'type': 'signature', 'length': len(AccessorySignature), 'data': AccessorySignature})
 		output = tlv.pack(response)
 
 		ciphertext, mac = HapHandler.encryptAndSeal(hkdfEncKey, 'PS-Msg06', [ord(x) for x in output])
@@ -155,7 +155,7 @@ class HapHandler(SimpleHTTPRequestHandler):
 		#pybonjour.DNSServiceUpdateRecord(sdRef, None, 0, pybonjour.TXTRecord(txt))
 
 		response = []
-		response.append({'type': 'auth_tag', 'length': 1, 'data': 6})
+		response.append({'type': 'state', 'length': 1, 'data': 6})
 		response.append({'type': 'encrypted_data', 'length': len(ciphertext + mac), 'data': ciphertext + mac})
 		output = tlv.pack(response)
 
@@ -192,8 +192,8 @@ class HapHandler(SimpleHTTPRequestHandler):
 
 		# Step 5
 		response = []
-		response.append({'type': 'user', 'length': len(AccessoryPairingID), 'data': AccessoryPairingID})
-		response.append({'type': 'certificate', 'length': len(AccessorySignature), 'data': AccessorySignature})
+		response.append({'type': 'identifier', 'length': len(AccessoryPairingID), 'data': AccessoryPairingID})
+		response.append({'type': 'signature', 'length': len(AccessorySignature), 'data': AccessorySignature})
 		subTLV = tlv.pack(response)
 
 		# Step 6
@@ -225,7 +225,7 @@ class HapHandler(SimpleHTTPRequestHandler):
 		ciphertext, mac = HapHandler.encryptAndSeal(sessionKey, 'PV-Msg02', [ord(x) for x in subTLV])
 
 		response = []
-		response.append({'type': 'auth_tag', 'length': 1, 'data': 2})
+		response.append({'type': 'state', 'length': 1, 'data': 2})
 		response.append({'type': 'public_key', 'length': len(publicSerialized), 'data': publicSerialized})
 		response.append({'type': 'encrypted_data', 'length': len(ciphertext + mac), 'data': ciphertext + mac})
 		output = tlv.pack(response)
@@ -244,7 +244,7 @@ class HapHandler(SimpleHTTPRequestHandler):
 		self.encrypted = True
 
 		response = []
-		response.append({'type': 'auth_tag', 'length': 1, 'data': 4})
+		response.append({'type': 'state', 'length': 1, 'data': 4})
 		output = tlv.pack(response)
 
 		self.send_response(200)
@@ -264,16 +264,16 @@ class HapHandler(SimpleHTTPRequestHandler):
 		tlvData = tlv.unpack(data)
 
 		if self.path == '/pair-setup':
-			if tlvData['auth_tag']['data'][0] == 1:
+			if tlvData['state']['data'][0] == 1:
 				self.pairSetupStep1()
-			if tlvData['auth_tag']['data'][0] == 3:
+			if tlvData['state']['data'][0] == 3:
 				self.pairSetupStep2(tlvData)
-			if tlvData['auth_tag']['data'][0] == 5:
+			if tlvData['state']['data'][0] == 5:
 				self.pairSetupStep3(tlvData)
 		elif self.path == '/pair-verify':
-			if tlvData['auth_tag']['data'][0] == 1:
+			if tlvData['state']['data'][0] == 1:
 				self.pairVerifyStep1(tlvData)
-			if tlvData['auth_tag']['data'][0] == 3:
+			if tlvData['state']['data'][0] == 3:
 				self.pairVerifyStep2(tlvData)
 		else:
 			logging.error('Got call to un unknown HomeKit path: %s', self.path)
