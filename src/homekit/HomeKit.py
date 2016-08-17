@@ -25,6 +25,9 @@ class RequestHandler(HapHandler):
 	def addPairing(self, identifier, publicKey, permissions):
 		return self.hk.addPairing(identifier, publicKey, permissions)
 
+	def removePairing(self, identifier):
+		return self.hk.removePairing(identifier)
+
 	def do_encrypted_GET(self):
 		logging.warning('Encrypted GET to %s', self.path)
 		url = urlparse(self.path)
@@ -130,6 +133,14 @@ class HomeKit(Plugin):
 			'publicKey': publicKey,
 			'admin': permissions
 		}
+		s = Settings('homekit')
+		s['clients'] = self.clients
+		return True
+
+	def removePairing(self, identifier):
+		if identifier not in self.clients:
+			return True
+		del self.clients[identifier]
 		s = Settings('homekit')
 		s['clients'] = self.clients
 		return True

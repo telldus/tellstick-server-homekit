@@ -253,7 +253,10 @@ class HapHandler(SimpleHTTPRequestHandler):
 		self.end_headers()
 		self.output(output)
 
-	def addPairing(self, tlvData):
+	def addPairing(self, identifier, publicKey, admin):
+		return False
+
+	def removePairing(self, identifier):
 		return False
 
 	def __addPairing(self, tlvData):
@@ -276,11 +279,27 @@ class HapHandler(SimpleHTTPRequestHandler):
 
 		self.sendEncryptedResponse(output, contentType='application/pairing+tlv8')
 
+	def __removePairing(self, tlvData):
+		identifier = ''.join([chr(x) for x in tlvData['identifier']['data']])
+		# TODO: Check admin bit
+
+		logging.warning("Remove pairing %s", identifier)
+		response = []
+		if self.removePairing(identifier):
+			response.append({'type': 'state', 'length': 1, 'data': 2})
+		else:
+			response.append({'type': 'state', 'length': 1, 'data': 2})
+			response.append({'type': 'error', 'length': 1, 'data': 1})
+		output = tlv.pack(response)
+		self.sendEncryptedResponse(output, contentType='application/pairing+tlv8')
+
 	def do_encrypted_POST(self):
 		if self.path == '/pairings':
 			tlvData = tlv.unpack(self.parsedRequest)
 			if tlvData['method']['data'][0] == 3:
 				self.__addPairing(tlvData)
+			elif tlvData['method']['data'][0] == 4:
+				self.__removePairing(tlvData)
 
 	def do_POST(self):
 		logging.warning('POST to %s', self.path)
