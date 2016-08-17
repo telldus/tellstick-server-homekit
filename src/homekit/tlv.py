@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 tlv_types = {
-	'auth_method': 0x00,     # kTLVType_Method
+	'method': 0x00,          # kTLVType_Method
 	'identifier': 0x01,      # kTLVType_Identifier
 	'salt': 0x02,            # kTLVType_Salt
 	'public_key': 0x03,      # kTLVType_PublicKey

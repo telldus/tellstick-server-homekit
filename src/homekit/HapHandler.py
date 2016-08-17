@@ -293,6 +293,19 @@ class HapHandler(SimpleHTTPRequestHandler):
 		output = tlv.pack(response)
 		self.sendEncryptedResponse(output, contentType='application/pairing+tlv8')
 
+	def pairings(self, tlvData):
+		response = []
+		response.append({'type': 'state', 'length': 1, 'data': 2})
+		for pairing in self.retrievePairings():
+			if len(response) > 1:
+				response.append({'type': 'separator', 'length': 0, 'data': ''})
+			response.append({'type': 'identifier', 'length': len(pairing['identifier']), 'data': str(pairing['identifier'])})
+			response.append({'type': 'public_key', 'length': len(pairing['publicKey']), 'data': str(pairing['publicKey'])})
+			response.append({'type': 'permissions', 'length': 1, 'data': pairing['permissions']})
+		output = tlv.pack(response)
+
+		self.sendEncryptedResponse(output, contentType='application/pairing+tlv8')
+
 	def do_encrypted_POST(self):
 		if self.path == '/pairings':
 			tlvData = tlv.unpack(self.parsedRequest)
@@ -300,6 +313,8 @@ class HapHandler(SimpleHTTPRequestHandler):
 				self.__addPairing(tlvData)
 			elif tlvData['method']['data'][0] == 4:
 				self.__removePairing(tlvData)
+			elif tlvData['method']['data'][0] == 5:
+				self.pairings(tlvData)
 
 	def do_POST(self):
 		logging.warning('POST to %s', self.path)

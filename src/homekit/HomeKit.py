@@ -28,6 +28,17 @@ class RequestHandler(HapHandler):
 	def removePairing(self, identifier):
 		return self.hk.removePairing(identifier)
 
+	def retrievePairings(self):
+		retval = []
+		clients = self.hk.clients
+		for identifier in clients:
+			retval.append({
+				'identifier': identifier,
+				'publicKey': clients[identifier]['publicKey'],
+				'permissions': clients[identifier]['admin']}
+			)
+		return retval
+
 	def do_encrypted_GET(self):
 		logging.warning('Encrypted GET to %s', self.path)
 		url = urlparse(self.path)
