@@ -69,8 +69,19 @@ class HTTPDServer(object):
 		logging.warning("Server was shut down")
 
 class HapDeviceStateCharacteristics(HapCharacteristic):
-	def __init__(self):
+	def __init__(self, device):
+		self.device = device
 		super(HapDeviceStateCharacteristics,self).__init__(value=self.value(), format='bool', type='25', perms=['pr', 'pw', 'ev'])
+
+	def value(self):
+		state, stateValue = self.device.state()
+		return state == Device.TURNON
+
+	def setValue(self, value):
+		if int(value) == 1:
+			self.device.command(Device.TURNON, origin='HomeKit')
+		elif int(value) == 0:
+			self.device.command(Device.TURNOFF, origin='HomeKit')
 
 class HapBridgeAccessory(HapAccessory):
 	def __init__(self):
@@ -82,7 +93,7 @@ class HapDeviceAccessory(HapAccessory):
 		self.device = device
 		service = HapService('43')
 		service.addCharacteristics(HapCharacteristic(device.name(), type='23', perms=['pr']))
-		service.addCharacteristics(HapDeviceStateCharacteristics())
+		service.addCharacteristics(HapDeviceStateCharacteristics(device))
 		self.addService(service)
 
 class HomeKit(Plugin):
