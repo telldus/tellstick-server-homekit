@@ -13,6 +13,10 @@ import json
 from board import Board
 
 class RequestHandler(HapHandler):
+	def finish(self):
+		HapHandler.finish(self)
+		RequestHandler.HTTPDServer.lostConnection(self)
+
 	def do_encrypted_GET(self):
 		logging.warning('Encrypted GET to %s', self.path)
 
@@ -31,7 +35,14 @@ class HTTPDServer(object):
 		self.thread.start()
 		Application().registerShutdown(self.sh)
 
+	def lostConnection(self, conn):
+		if conn in self.connections:
+			self.connections.remove(conn)
+
 	def newConnection(self, conn):
+		if conn in self.connections:
+			return
+		self.connections.append(conn)
 		HomeKit(self.context).newConnection(conn)
 
 	def sh(self):
