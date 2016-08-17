@@ -94,10 +94,12 @@ class HapDeviceAccessory(HapAccessory):
 	def __init__(self, device):
 		super(HapDeviceAccessory,self).__init__('Acme', device.typeString(), device.name(), device.id())
 		self.device = device
-		service = HapService('43')
-		service.addCharacteristics(HapCharacteristic(device.name(), type='23', perms=['pr']))
-		service.addCharacteristics(HapDeviceStateCharacteristics(device))
-		self.addService(service)
+		methods = device.methods()
+		if (methods & (Device.TURNON | Device.TURNOFF) > 0):
+			# Supports On/Off
+			service = HapService('49')
+			service.addCharacteristics(HapDeviceStateCharacteristics(device))
+			self.addService(service)
 
 class HomeKit(Plugin):
 	implements(IDeviceChange)
