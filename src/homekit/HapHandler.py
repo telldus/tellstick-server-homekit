@@ -111,8 +111,7 @@ class HapHandler(SimpleHTTPRequestHandler):
 
 		verifyingKey = ed25519.VerifyingKey(clientLTPK)
 
-		logging.warning('Store this persistant')
-		logging.warning("'%s': '%s'", clientUsername, ed25519.VerifyingKey(clientLTPK).to_ascii(encoding='hex'))
+		self.addPairing(clientUsername, ed25519.VerifyingKey(clientLTPK).to_ascii(encoding='hex'), 1)
 
 		try:
 			verifyingKey.verify(clientProof, completeData)

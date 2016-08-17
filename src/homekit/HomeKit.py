@@ -23,8 +23,7 @@ class RequestHandler(HapHandler):
 		RequestHandler.HTTPDServer.lostConnection(self)
 
 	def addPairing(self, identifier, publicKey, permissions):
-		self.hk.addPairing(identifier, publicKey, permissions)
-		return True
+		return self.hk.addPairing(identifier, publicKey, permissions)
 
 	def do_encrypted_GET(self):
 		logging.warning('Encrypted GET to %s', self.path)
@@ -133,6 +132,7 @@ class HomeKit(Plugin):
 		}
 		s = Settings('homekit')
 		s['clients'] = self.clients
+		return True
 
 	def handleAccessories(self, request):
 		accessories = [{'aid': i, 'services': self.accessories[i].servicesJSON()} for i in self.accessories]
