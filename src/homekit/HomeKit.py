@@ -32,6 +32,12 @@ class RequestHandler(HapHandler):
 			self.query = dict(parse_qsl(url.query))
 			hk.handleCharacteristicsGet(self)
 
+	def do_encrypted_PUT(self):
+		hk = HomeKit(RequestHandler.HTTPDServer.context)
+		if self.path == '/characteristics':
+			data = json.loads(self.parsedRequest)
+			hk.handleCharacteristicsPut(self, data)
+
 	def setup(self):
 		HapHandler.setup(self)
 		RequestHandler.HTTPDServer.newConnection(self)
@@ -130,6 +136,24 @@ class HomeKit(Plugin):
 				if 'status' not in c:
 					c['status'] = 0
 		request.sendEncryptedResponse({'characteristics': retval})
+
+	def handleCharacteristicsPut(self, request, body):
+		if 'characteristics' not in body:
+			return
+		for c in body['characteristics']:
+			if 'aid' not in c or 'iid' not in c or 'value' not in c:
+				continue
+			aid = int(c['aid'])
+			iid = int(c['iid'])
+			if aid not in self.accessories:
+				logging.warning("Could not find accessory %s in %s", aid, self.accessories)
+				continue
+			characteristic = self.accessories[aid].characteristic(iid)
+			if not characteristic:
+				logging.error("Could not find characteristic")
+				return
+			characteristic.setValue(c['value'])
+		request.sendEncryptedResponse('', '204 No Content')
 
 	def newConnection(self, conn):
 		s = Settings('homekit')
