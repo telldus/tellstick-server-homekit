@@ -83,8 +83,10 @@ class HTTPDServer(object):
 		HomeKit(self.context).newConnection(conn)
 
 	def sh(self):
-		logging.warning("Shutting down HAP server")
-		#self.httpServer.shutdown()
+		for c in self.connections:
+			c.close_connection = 1
+		self.httpServer.shutdown()
+		self.httpServer.server_close()
 		logging.warning("Server was shut down")
 
 class HapDeviceStateCharacteristics(HapCharacteristic):
