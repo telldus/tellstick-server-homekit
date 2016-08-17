@@ -5,7 +5,7 @@ from board import Board
 from telldus import DeviceManager, IDeviceChange, Device
 from Bonjour import Bonjour
 from HapHandler import HapHandler
-from SocketServer import TCPServer
+from SocketServer import TCPServer, ThreadingMixIn
 from threading import Thread
 from urlparse import urlparse, parse_qsl
 
@@ -42,12 +42,15 @@ class RequestHandler(HapHandler):
 		HapHandler.setup(self)
 		RequestHandler.HTTPDServer.newConnection(self)
 
+class ThreadedTCPServer(ThreadingMixIn, TCPServer):
+	daemon_threads = True
+
 class HTTPDServer(object):
 	def __init__(self, port, context):
 		RequestHandler.HTTPDServer = self
 		self.context = context
 		self.connections = []
-		self.httpServer = TCPServer(('', port), RequestHandler)
+		self.httpServer = ThreadedTCPServer(('', port), RequestHandler)
 		self.thread = Thread(target=self.httpServer.serve_forever, name='HomeKit http server')
 		self.thread.daemon = True
 		self.thread.start()
