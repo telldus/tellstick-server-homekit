@@ -28,6 +28,9 @@ class RequestHandler(HapHandler):
 		url = urlparse(self.path)
 		if url.path == '/accessories':
 			hk.handleAccessories(self)
+		elif url.path == '/characteristics':
+			self.query = dict(parse_qsl(url.query))
+			hk.handleCharacteristicsGet(self)
 
 	def setup(self):
 		HapHandler.setup(self)
@@ -97,6 +100,36 @@ class HomeKit(Plugin):
 	def handleAccessories(self, request):
 		accessories = [{'aid': i, 'services': self.accessories[i].servicesJSON()} for i in self.accessories]
 		request.sendEncryptedResponse({'accessories': accessories})
+
+	def handleCharacteristicsGet(self, request):
+		if 'id' not in request.query:
+			request.sendEncryptedResponse('', '400 Bad request')
+			return
+		retval = []
+		errorFound = False
+		ids = request.query['id'].split(',')
+		for idPath in ids:
+			path = idPath.split('.')
+			if len(path) != 2:
+				return
+			aid = int(path[0])
+			iid = int(path[1])
+			if aid not in self.accessories:
+				retval.append({'aid': aid, 'iid': iid, 'status': 1})
+				errorFound = True
+				continue
+			accessory = self.accessories[aid]
+			characteristic = accessory.characteristic(iid)
+			if not characteristic:
+				retval.append({'aid': aid, 'iid': iid, 'status': 2})
+				errorFound = True
+				continue
+			retval.append({'aid': aid, 'iid': iid, 'value': characteristic['value']})
+		if errorFound:
+			for c in retval:
+				if 'status' not in c:
+					c['status'] = 0
+		request.sendEncryptedResponse({'characteristics': retval})
 
 	def newConnection(self, conn):
 		s = Settings('homekit')
