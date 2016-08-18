@@ -326,13 +326,11 @@ class HapHandler(SimpleHTTPRequestHandler):
 		logging.warning('PublicKey %s', publicKey)
 		logging.warning('Permissions %s', admin)
 
-		# TODO: Check admin bit
-
 		response = []
-		if self.addPairing(identifier, publicKey, admin):
-			response.append({'type': 'state', 'length': 1, 'data': 2})
-		else:
-			response.append({'type': 'state', 'length': 1, 'data': 2})
+		response.append({'type': 'state', 'length': 1, 'data': 2})
+		if self.sessionStorage['admin'] != 1:
+			response.append({'type': 'error', 'length': 1, 'data': 2})
+		elif not self.addPairing(identifier, publicKey, admin):
 			response.append({'type': 'error', 'length': 1, 'data': 1})
 		output = tlv.pack(response)
 
@@ -340,14 +338,13 @@ class HapHandler(SimpleHTTPRequestHandler):
 
 	def __removePairing(self, tlvData):
 		identifier = ''.join([chr(x) for x in tlvData['identifier']['data']])
-		# TODO: Check admin bit
 
 		logging.warning("Remove pairing %s", identifier)
 		response = []
-		if self.removePairing(identifier):
-			response.append({'type': 'state', 'length': 1, 'data': 2})
-		else:
-			response.append({'type': 'state', 'length': 1, 'data': 2})
+		response.append({'type': 'state', 'length': 1, 'data': 2})
+		if self.sessionStorage['admin'] != 1:
+			response.append({'type': 'error', 'length': 1, 'data': 2})
+		elif not self.removePairing(identifier):
 			response.append({'type': 'error', 'length': 1, 'data': 1})
 		output = tlv.pack(response)
 		self.sendEncryptedResponse(output, contentType='application/pairing+tlv8')
