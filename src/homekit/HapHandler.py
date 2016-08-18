@@ -269,9 +269,6 @@ class HapHandler(SimpleHTTPRequestHandler):
 		identifier = ''.join([chr(x) for x in tlvData['identifier']['data']])
 		publicKey = ''.join(['%x' % x for x in tlvData['public_key']['data']])
 		admin = tlvData['permissions']['data'][0]
-		logging.warning('Identifier %s', identifier)
-		logging.warning('PublicKey %s', publicKey)
-		logging.warning('Permissions %s', admin)
 
 		response = []
 		response.append({'type': 'state', 'length': 1, 'data': 2})
