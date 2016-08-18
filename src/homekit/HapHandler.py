@@ -257,7 +257,27 @@ class HapHandler(SimpleHTTPRequestHandler):
 		unpackedTLV = tlv.unpack(plainText)
 
 		# Step 3
-		# TODO: Lookup the iOS device long-term public-key, iOSDeviceLTPK in our list of clients
+		iOSDevicePairingID = ''.join([chr(x) for x in unpackedTLV['identifier']['data']])
+		iOSDeviceSignature = ''.join([chr(x) for x in unpackedTLV['signature']['data']])
+		pairing = None
+		for p in self.retrievePairings():
+			if iOSDevicePairingID == p['identifier']:
+				pairing = p
+				break
+		if pairing is None:
+			response = []
+			response.append({'type': 'state', 'length': 1, 'data': 4})
+			response.append({'type': 'error', 'length': 1, 'data': 2})
+			output = tlv.pack(response)
+
+			self.send_response(200)
+			self.send_header('Content-Type', 'application/pairing+tlv8')
+			self.send_header('Connection', 'keep-alive')
+			self.send_header('Content-Length', len(output))
+			self.end_headers()
+			return
+		self.sessionStorage['clientID'] = iOSDevicePairingID
+		self.sessionStorage['clientLTPK'] = pairing['publicKey']
 
 		# Step 4
 		# TODO: Use Ed25519 to verify iOSDeviceSignature using iOSDeviceLTPK against iOSDeviceInfo contained in unpackedTLV.
