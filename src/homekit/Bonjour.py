@@ -11,8 +11,18 @@ import struct
 import logging
 
 class Bonjour(object):
-	def __init__(self, port):
+	def __init__(self, port, c, sf):
 		self.port = port
+		self.txt = {
+			'pv': '1.0',
+			'id': Bonjour.getMacAddr(Board.networkInterface()),
+			'c#': c, # Configuration number, must change anytime something changes. Rollover on 4294967295
+			's#': '1',
+			'sf': sf, # 1 = discoverable, 0 pair setup done
+			'ff': '0', # 1 = haz da chip, 0 = does not
+			'md': Board.product(),
+			'ci': '2'
+		}
 		self.thread = Thread(target=self.run, name='Bonjour')
 		self.thread.daemon = True
 		self.thread.start()
@@ -27,29 +37,24 @@ class Bonjour(object):
 
 	def run(self):
 		name = 'Mickes dator'  # TODO
-		txt = {
-			'pv': '1.0',
-			'id': Bonjour.getMacAddr(Board.networkInterface()),
-			'c#': '1',
-			's#': '1',
-			'sf': '1', # 1 = discoverable, 0 pair setup done
-			'ff': '0', # 1 = haz da chip, 0 = does not
-			'md': Board.product(),
-			'ci': '2'
-		}
-		sdRef = pybonjour.DNSServiceRegister(name = name,
+		self.sdRef = pybonjour.DNSServiceRegister(name = name,
 			regtype = '_hap._tcp',
 			port = self.port,
-			txtRecord = pybonjour.TXTRecord(txt),
+			txtRecord = pybonjour.TXTRecord(self.txt),
 			callBack = self.register
 		)
 		try:
 			while True:
-				ready = select.select([sdRef], [], [])
-				if sdRef in ready[0]:
-					pybonjour.DNSServiceProcessResult(sdRef)
+				ready = select.select([self.sdRef], [], [])
+				if self.sdRef in ready[0]:
+					pybonjour.DNSServiceProcessResult(self.sdRef)
 		finally:
-			sdRef.close()
+			self.sdRef.close()
+
+	def updateRecord(self, **values):
+		for k in values:
+			self.txt[k] = values[k]
+		pybonjour.DNSServiceUpdateRecord(self.sdRef, None, 0, pybonjour.TXTRecord(self.txt))
 
 	@staticmethod
 	def getMacAddr(ifname):

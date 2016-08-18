@@ -128,12 +128,14 @@ class HomeKit(Plugin):
 		self.accessories[1] = HapBridgeAccessory()
 		s = Settings('homekit')
 		self.clients = s.get('clients', {})
+		self.configurationNumber = s.get('configurationNumber', 1)
 		self.longTermKey = s.get('longTermKey', None)
 		self.password = s.get('password', None)
 
 	def start(self):
 		self.port    = random.randint(8000, 8080)
-		self.bonjour = Bonjour(port=self.port)
+		sf = 1 if len(self.clients) == 0 else 0
+		self.bonjour = Bonjour(port=self.port, c=self.configurationNumber, sf=sf)
 		self.httpServer = HTTPDServer(port=self.port, context=self.context)
 		deviceManager = DeviceManager(self.context)
 		for device in deviceManager.retrieveDevices():
@@ -148,6 +150,8 @@ class HomeKit(Plugin):
 		}
 		s = Settings('homekit')
 		s['clients'] = self.clients
+		# Non discoverable
+		self.bonjour.updateRecord(sf=0)
 		return True
 
 	def removePairing(self, identifier):
@@ -156,6 +160,9 @@ class HomeKit(Plugin):
 		del self.clients[identifier]
 		s = Settings('homekit')
 		s['clients'] = self.clients
+		if len(self.clients) == 0:
+			# Discoverable again
+			self.bonjour.updateRecord(sf=1)
 		return True
 
 	def handleAccessories(self, request):
