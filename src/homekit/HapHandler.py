@@ -233,9 +233,36 @@ class HapHandler(SimpleHTTPRequestHandler):
 		self.output(output)
 
 	def pairVerifyStep2(self, tlvData):
-		publicKey = tlvData['encrypted_data']['data']
+		# Step 1
+		encryptedData = tlvData['encrypted_data']['data']
+		messageData = encryptedData[:-16]
+		authTagData = encryptedData[-16:]
 
-		# TODO Verify encrypted_data
+		try:
+			plainText = HapHandler.verifyAndDecrypt(self.sessionStorage['hkdfPairEncKey'], 'PV-Msg03', messageData, authTagData)
+		except Exception as e:
+			response = []
+			response.append({'type': 'state', 'length': 1, 'data': 4})
+			response.append({'type': 'error', 'length': 1, 'data': 2})
+			output = tlv.pack(response)
+
+			self.send_response(200)
+			self.send_header('Content-Type', 'application/pairing+tlv8')
+			self.send_header('Connection', 'keep-alive')
+			self.send_header('Content-Length', len(output))
+			self.end_headers()
+			return
+
+		# Step 2
+		unpackedTLV = tlv.unpack(plainText)
+
+		# Step 3
+		# TODO: Lookup the iOS device long-term public-key, iOSDeviceLTPK in our list of clients
+
+		# Step 4
+		# TODO: Use Ed25519 to verify iOSDeviceSignature using iOSDeviceLTPK against iOSDeviceInfo contained in unpackedTLV.
+
+		# Step 5
 		self.encrypted = True
 
 		response = []
