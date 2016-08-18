@@ -107,6 +107,29 @@ class HapDeviceOnCharacteristics(HapCharacteristic):
 		elif int(value) == 0:
 			self.device.command(Device.TURNOFF, origin='HomeKit')
 
+class HapDeviceBrightnessCharacteristics(HapCharacteristic):
+	def __init__(self, device):
+		self.device = device
+		super(HapDeviceBrightnessCharacteristics,self).__init__(value=self.value(), type='8', perms=['pr', 'pw', 'ev'], minValue=0, maxValue=100, minStep=1, unit='percentage')
+
+	def value(self):
+		state, stateValue = self.device.state()
+		if state == Device.DIM:
+			return int(round(int(stateValue)/255.0*100.0))
+		if state == Device.TURNON:
+			return 100
+		if state == Device.TURNOFF:
+			return 0
+		return None
+
+	def setValue(self, value):
+		if int(value) == 100:
+			self.device.command(Device.TURNON, origin='HomeKit')
+		elif int(value) == 0:
+			self.device.command(Device.TURNOFF, origin='HomeKit')
+		else:
+			self.device.command(Device.DIM, int(round(value/100.0*255.0)), origin='HomeKit')
+
 class HapBridgeAccessory(HapAccessory):
 	def __init__(self):
 		super(HapBridgeAccessory,self).__init__('Telldus Technologies', Board.product(), 'Mickes dator', HapHandler.getId())
@@ -116,8 +139,14 @@ class HapDeviceAccessory(HapAccessory):
 		super(HapDeviceAccessory,self).__init__('Acme', device.typeString(), device.name(), device.id())
 		self.device = device
 		methods = device.methods()
-		if (methods & (Device.TURNON | Device.TURNOFF) > 0):
-			# Supports On/Off
+		if (methods & Device.DIM > 0):
+			# Supports Dim - Type=Bulb
+			service = HapService('43')
+			service.addCharacteristics(HapDeviceOnCharacteristics(device))
+			service.addCharacteristics(HapDeviceBrightnessCharacteristics(device))
+			self.addService(service)
+		elif (methods & (Device.TURNON | Device.TURNOFF) > 0):
+			# Supports On/Off - Type=Switch
 			service = HapService('49')
 			service.addCharacteristics(HapDeviceOnCharacteristics(device))
 			self.addService(service)
