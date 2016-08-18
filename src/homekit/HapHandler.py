@@ -35,18 +35,11 @@ class HapHandler(SimpleHTTPRequestHandler):
 		self.sv = srp.Server(username, self.salt, verifier, bits)
 		self.B = long_to_bytes(self.sv.seed())
 
-		response = []
-		response.append({'type': 'state', 'length': 1, 'data': 2})
-		response.append({'type': 'public_key', 'length': len(self.B), 'data': self.B})
-		response.append({'type': 'salt', 'length': len(self.salt), 'data': self.salt})
-		output = tlv.pack(response)
-
-		self.send_response(200)
-		self.send_header('Content-Type', 'application/pairing+tlv8')
-		self.send_header('Connection', 'keep-alive')
-		self.send_header('Content-Length', len(output))
-		self.end_headers()
-		self.output(output)
+		self.sendTLVResponse([
+			{'type': 'state', 'length': 1, 'data': 2},
+			{'type': 'public_key', 'length': len(self.B), 'data': self.B},
+			{'type': 'salt', 'length': len(self.salt), 'data': self.salt},
+		])
 
 	def pairSetupStep2(self, tlvData):
 		publicKey = ''.join([chr(x) for x in (tlvData['public_key']['data'])])
@@ -55,17 +48,10 @@ class HapHandler(SimpleHTTPRequestHandler):
 		# TODO: Handle failure if the password if wrong
 		serverProof = self.sv.proof(bytes_to_long(publicKey), proof)
 
-		response = []
-		response.append({'type': 'state', 'length': 1, 'data': 4})
-		response.append({'type': 'proof', 'length': len(serverProof), 'data': serverProof})
-		output = tlv.pack(response)
-
-		self.send_response(200)
-		self.send_header('Content-Type', 'application/pairing+tlv8')
-		self.send_header('Connection', 'keep-alive')
-		self.send_header('Content-Length', len(output))
-		self.end_headers()
-		self.output(output)
+		self.sendTLVResponse([
+			{'type': 'state', 'length': 1, 'data': 4},
+			{'type': 'proof', 'length': len(serverProof), 'data': serverProof},
+		])
 
 	def pairSetupStep3(self, tlvData):
 		encryptedData = tlvData['encrypted_data']['data']
@@ -149,17 +135,10 @@ class HapHandler(SimpleHTTPRequestHandler):
 		ciphertext = ''.join([chr(x) for x in ciphertext])
 		mac = ''.join([chr(x) for x in mac])
 
-		response = []
-		response.append({'type': 'state', 'length': 1, 'data': 6})
-		response.append({'type': 'encrypted_data', 'length': len(ciphertext + mac), 'data': ciphertext + mac})
-		output = tlv.pack(response)
-
-		self.send_response(200)
-		self.send_header('Content-Type', 'application/pairing+tlv8')
-		self.send_header('Connection', 'keep-alive')
-		self.send_header('Content-Length', len(output))
-		self.end_headers()
-		self.output(output)
+		self.sendTLVResponse([
+			{'type': 'state', 'length': 1, 'data': 6},
+			{'type': 'encrypted_data', 'length': len(ciphertext + mac), 'data': ciphertext + mac},
+		])
 
 	def pairVerifyStep1(self, tlvData):
 		publicKey = tlvData['public_key']['data']
@@ -219,18 +198,11 @@ class HapHandler(SimpleHTTPRequestHandler):
 		# Step 7
 		ciphertext, mac = HapHandler.encryptAndSeal(sessionKey, 'PV-Msg02', [ord(x) for x in subTLV])
 
-		response = []
-		response.append({'type': 'state', 'length': 1, 'data': 2})
-		response.append({'type': 'public_key', 'length': len(publicSerialized), 'data': publicSerialized})
-		response.append({'type': 'encrypted_data', 'length': len(ciphertext + mac), 'data': ciphertext + mac})
-		output = tlv.pack(response)
-
-		self.send_response(200)
-		self.send_header('Content-Type', 'application/pairing+tlv8')
-		self.send_header('Connection', 'keep-alive')
-		self.send_header('Content-Length', len(output))
-		self.end_headers()
-		self.output(output)
+		self.sendTLVResponse([
+			{'type': 'state', 'length': 1, 'data': 2},
+			{'type': 'public_key', 'length': len(publicSerialized), 'data': publicSerialized},
+			{'type': 'encrypted_data', 'length': len(ciphertext + mac), 'data': ciphertext + mac},
+		])
 
 	def pairVerifyStep2(self, tlvData):
 		# Step 1
@@ -241,16 +213,10 @@ class HapHandler(SimpleHTTPRequestHandler):
 		try:
 			plainText = HapHandler.verifyAndDecrypt(self.sessionStorage['hkdfPairEncKey'], 'PV-Msg03', messageData, authTagData)
 		except Exception as e:
-			response = []
-			response.append({'type': 'state', 'length': 1, 'data': 4})
-			response.append({'type': 'error', 'length': 1, 'data': 2})
-			output = tlv.pack(response)
-
-			self.send_response(200)
-			self.send_header('Content-Type', 'application/pairing+tlv8')
-			self.send_header('Connection', 'keep-alive')
-			self.send_header('Content-Length', len(output))
-			self.end_headers()
+			self.sendTLVResponse([
+				{'type': 'state', 'length': 1, 'data': 4},
+				{'type': 'error', 'length': 1, 'data': 2},
+			])
 			return
 
 		# Step 2
@@ -265,16 +231,10 @@ class HapHandler(SimpleHTTPRequestHandler):
 				pairing = p
 				break
 		if pairing is None:
-			response = []
-			response.append({'type': 'state', 'length': 1, 'data': 4})
-			response.append({'type': 'error', 'length': 1, 'data': 2})
-			output = tlv.pack(response)
-
-			self.send_response(200)
-			self.send_header('Content-Type', 'application/pairing+tlv8')
-			self.send_header('Connection', 'keep-alive')
-			self.send_header('Content-Length', len(output))
-			self.end_headers()
+			self.sendTLVResponse([
+				{'type': 'state', 'length': 1, 'data': 4},
+				{'type': 'error', 'length': 1, 'data': 2},
+			])
 			return
 		self.sessionStorage['clientID'] = iOSDevicePairingID
 		self.sessionStorage['clientLTPK'] = pairing['publicKey']
@@ -286,31 +246,18 @@ class HapHandler(SimpleHTTPRequestHandler):
 		try:
 			verifyingKey.verify(iOSDeviceSignature, iOSDeviceInfo)
 		except ed25519.BadSignatureError:
-			response = []
-			response.append({'type': 'state', 'length': 1, 'data': 4})
-			response.append({'type': 'error', 'length': 1, 'data': 2})
-			output = tlv.pack(response)
-
-			self.send_response(200)
-			self.send_header('Content-Type', 'application/pairing+tlv8')
-			self.send_header('Connection', 'keep-alive')
-			self.send_header('Content-Length', len(output))
-			self.end_headers()
+			self.sendTLVResponse([
+				{'type': 'state', 'length': 1, 'data': 4},
+				{'type': 'error', 'length': 1, 'data': 2},
+			])
 			return
 
 		# Step 5
 		self.encrypted = True
 
-		response = []
-		response.append({'type': 'state', 'length': 1, 'data': 4})
-		output = tlv.pack(response)
-
-		self.send_response(200)
-		self.send_header('Content-Type', 'application/pairing+tlv8')
-		self.send_header('Connection', 'keep-alive')
-		self.send_header('Content-Length', len(output))
-		self.end_headers()
-		self.output(output)
+		self.sendTLVResponse([
+			{'type': 'state', 'length': 1, 'data': 4}
+		])
 
 	def addPairing(self, identifier, publicKey, admin):
 		return False
@@ -504,6 +451,19 @@ class HapHandler(SimpleHTTPRequestHandler):
 	def output(self, data):
 		for c in data:
 			self.wfile.write(c)
+
+	def sendTLVResponse(self, tlvData):
+		if type(tlvData) is list:
+			output = tlv.pack(tlvData)
+		else:
+			output = tlvData
+		self.send_response(200)
+		self.send_header('Content-Type', 'application/pairing+tlv8')
+		self.send_header('Connection', 'keep-alive')
+		self.send_header('Content-Length', len(output))
+		self.end_headers()
+		self.output(output)
+
 
 	def sendEncryptedResponse(self, msg, status='200 OK', contentType='application/hap+json'):
 		if type(msg) is dict:
