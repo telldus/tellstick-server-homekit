@@ -99,6 +99,9 @@ class HapDeviceOnCharacteristics(HapCharacteristic):
 		return state != Device.TURNOFF
 
 	def setValue(self, value):
+		state, stateValue = self.device.state()
+		if value == 1 and state != Device.TURNOFF:
+			return
 		if int(value) == 1:
 			self.device.command(Device.TURNON, origin='HomeKit')
 		elif int(value) == 0:
