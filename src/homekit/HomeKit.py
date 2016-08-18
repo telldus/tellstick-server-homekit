@@ -96,7 +96,7 @@ class HapDeviceOnCharacteristics(HapCharacteristic):
 
 	def value(self):
 		state, stateValue = self.device.state()
-		return state == Device.TURNON
+		return state != Device.TURNOFF
 
 	def setValue(self, value):
 		if int(value) == 1:
