@@ -278,9 +278,25 @@ class HapHandler(SimpleHTTPRequestHandler):
 			return
 		self.sessionStorage['clientID'] = iOSDevicePairingID
 		self.sessionStorage['clientLTPK'] = pairing['publicKey']
+		self.sessionStorage['admin'] = pairing['permissions']
 
 		# Step 4
-		# TODO: Use Ed25519 to verify iOSDeviceSignature using iOSDeviceLTPK against iOSDeviceInfo contained in unpackedTLV.
+		iOSDeviceInfo = self.sessionStorage['clientPublicKey'] + iOSDevicePairingID + self.sessionStorage['publicKey']
+		verifyingKey = ed25519.VerifyingKey(self.sessionStorage['clientLTPK'], encoding='hex')
+		try:
+			verifyingKey.verify(iOSDeviceSignature, iOSDeviceInfo)
+		except ed25519.BadSignatureError:
+			response = []
+			response.append({'type': 'state', 'length': 1, 'data': 4})
+			response.append({'type': 'error', 'length': 1, 'data': 2})
+			output = tlv.pack(response)
+
+			self.send_response(200)
+			self.send_header('Content-Type', 'application/pairing+tlv8')
+			self.send_header('Connection', 'keep-alive')
+			self.send_header('Content-Length', len(output))
+			self.end_headers()
+			return
 
 		# Step 5
 		self.encrypted = True
