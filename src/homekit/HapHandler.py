@@ -149,10 +149,6 @@ class HapHandler(SimpleHTTPRequestHandler):
 		ciphertext = ''.join([chr(x) for x in ciphertext])
 		mac = ''.join([chr(x) for x in mac])
 
-		# Todo
-		#txt['sf'] = 0
-		#pybonjour.DNSServiceUpdateRecord(sdRef, None, 0, pybonjour.TXTRecord(txt))
-
 		response = []
 		response.append({'type': 'state', 'length': 1, 'data': 6})
 		response.append({'type': 'encrypted_data', 'length': len(ciphertext + mac), 'data': ciphertext + mac})
