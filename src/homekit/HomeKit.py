@@ -10,7 +10,8 @@ from threading import Thread
 from urlparse import urlparse, parse_qsl
 
 from HapAccessory import HapAccessory, HapService
-from HapCharacteristics import HapCharacteristic, HapHueCharacteristics, HapSaturationCharacteristics
+from HapCharacteristics import *
+from TelldusCharacteristics import *
 import random
 import ed25519
 
@@ -90,24 +91,6 @@ class HTTPDServer(object):
 		self.httpServer.server_close()
 		logging.warning("Server was shut down")
 
-class HapDeviceOnCharacteristics(HapCharacteristic):
-	def __init__(self, device):
-		self.device = device
-		super(HapDeviceOnCharacteristics,self).__init__(value=self.value(), format='bool', type='25', perms=['pr', 'pw', 'ev'])
-
-	def value(self):
-		state, stateValue = self.device.state()
-		return state != Device.TURNOFF
-
-	def setValue(self, value):
-		state, stateValue = self.device.state()
-		if value == 1 and state != Device.TURNOFF:
-			return
-		if int(value) == 1:
-			self.device.command(Device.TURNON, origin='HomeKit')
-		elif int(value) == 0:
-			self.device.command(Device.TURNOFF, origin='HomeKit')
-
 class HapBridgeAccessory(HapAccessory):
 	def __init__(self):
 		super(HapBridgeAccessory,self).__init__('Telldus Technologies', Board.product(), 'Mickes dator', HapHandler.getId())
@@ -120,7 +103,7 @@ class HapDeviceAccessory(HapAccessory):
 		if methods & (Device.DIM | Device.RGBW) > 0:
 			# Supports Dim/RGBW - Type=Bulb
 			service = HapService('43')
-			service.addCharacteristics(HapDeviceOnCharacteristics(device))
+			service.addCharacteristics(OnCharacteristics(device))
 			if methods & Device.DIM > 0:
 				service.addCharacteristics(HapBrightnessCharacteristics(0))
 			if methods & Device.RGBW > 0:
@@ -130,7 +113,7 @@ class HapDeviceAccessory(HapAccessory):
 		elif methods & (Device.TURNON | Device.TURNOFF) > 0:
 			# Supports On/Off - Type=Switch
 			service = HapService('49')
-			service.addCharacteristics(HapDeviceOnCharacteristics(device))
+			service.addCharacteristics(OnCharacteristics(device))
 			self.addService(service)
 
 	def characteristicsWasUpdated(self, iids):
@@ -153,6 +136,12 @@ class HapDeviceAccessory(HapAccessory):
 				self.device.command(Device.TURNOFF, origin='HomeKit')
 			else:
 				self.device.command(Device.DIM, int(round(value/100.0*255.0)), origin='HomeKit')
+		elif HapCharacteristic.TYPE_ON in types:
+			value = types[HapCharacteristic.TYPE_ON].value()
+			if value == 1:
+				self.device.command(Device.TURNON, origin='HomeKit')
+			elif value == 0:
+				self.device.command(Device.TURNOFF, origin='HomeKit')
 
 class HomeKit(Plugin):
 	implements(IDeviceChange)
