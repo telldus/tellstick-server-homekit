@@ -31,7 +31,16 @@ class HapCharacteristic(object):
 		self.properties['value'] = value
 
 	def value(self):
-		return self.properties.get('value', None)
+		value = self.properties.get('value', None)
+		if self.properties['format'] == 'string':
+			return str(value)
+		if self.properties['format'] == 'bool':
+			return bool(value)
+		if self.properties['format'] == 'int':
+			return int(value)
+		if self.properties['format'] == 'float':
+			return float(value)
+		return value
 
 	def __getitem__(self, attr):
 		if attr == 'value':
