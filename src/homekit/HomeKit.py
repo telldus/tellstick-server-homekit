@@ -110,7 +110,7 @@ class HapDeviceOnCharacteristics(HapCharacteristic):
 class HapDeviceBrightnessCharacteristics(HapCharacteristic):
 	def __init__(self, device):
 		self.device = device
-		super(HapDeviceBrightnessCharacteristics,self).__init__(value=self.value(), type='8', perms=['pr', 'pw', 'ev'], minValue=0, maxValue=100, minStep=1, unit='percentage')
+		super(HapDeviceBrightnessCharacteristics,self).__init__(value=self.value(), type='8', perms=['pr', 'pw', 'ev'], minValue=0, maxValue=100, minStep=1, unit='percentage', format='int')
 
 	def value(self):
 		state, stateValue = self.device.state()
