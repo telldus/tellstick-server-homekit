@@ -3,6 +3,8 @@
 import logging
 
 class HapCharacteristic(object):
+	TYPE_HUE = '13'
+
 	def __init__(self, value = None, **kwargs):
 		self.properties = kwargs
 		if value is not None:
@@ -39,3 +41,15 @@ class HapCharacteristic(object):
 			self.setValue(value)
 		else:
 			self.properties[attr] = value
+
+class HapHueCharacteristics(HapCharacteristic):
+	def __init__(self):
+		super(HapHueCharacteristics,self).__init__(
+			value=0,
+			type=HapCharacteristic.TYPE_HUE,
+			perms=['pr', 'pw', 'ev'],
+			minValue=0,
+			maxValue=360,
+			minStep=1,
+			unit='arcdegrees'
+		)
