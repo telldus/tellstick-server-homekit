@@ -267,7 +267,7 @@ class HapHandler(SimpleHTTPRequestHandler):
 
 	def __addPairing(self, tlvData):
 		identifier = ''.join([chr(x) for x in tlvData['identifier']['data']])
-		publicKey = ''.join(['%x' % x for x in tlvData['public_key']['data']])
+		publicKey = ''.join(['%02x' % x for x in tlvData['public_key']['data']])
 		admin = tlvData['permissions']['data'][0]
 
 		response = []
