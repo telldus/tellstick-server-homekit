@@ -108,29 +108,6 @@ class HapDeviceOnCharacteristics(HapCharacteristic):
 		elif int(value) == 0:
 			self.device.command(Device.TURNOFF, origin='HomeKit')
 
-class HapDeviceBrightnessCharacteristics(HapCharacteristic):
-	def __init__(self, device):
-		self.device = device
-		super(HapDeviceBrightnessCharacteristics,self).__init__(value=self.value(), type='8', perms=['pr', 'pw', 'ev'], minValue=0, maxValue=100, minStep=1, unit='percentage', format='int')
-
-	def value(self):
-		state, stateValue = self.device.state()
-		if state == Device.DIM:
-			return int(round(int(stateValue)/255.0*100.0))
-		if state == Device.TURNON:
-			return 100
-		if state == Device.TURNOFF:
-			return 0
-		return None
-
-	def setValue(self, value):
-		if int(value) == 100:
-			self.device.command(Device.TURNON, origin='HomeKit')
-		elif int(value) == 0:
-			self.device.command(Device.TURNOFF, origin='HomeKit')
-		else:
-			self.device.command(Device.DIM, int(round(value/100.0*255.0)), origin='HomeKit')
-
 class HapBridgeAccessory(HapAccessory):
 	def __init__(self):
 		super(HapBridgeAccessory,self).__init__('Telldus Technologies', Board.product(), 'Mickes dator', HapHandler.getId())
@@ -145,7 +122,7 @@ class HapDeviceAccessory(HapAccessory):
 			service = HapService('43')
 			service.addCharacteristics(HapDeviceOnCharacteristics(device))
 			if methods & Device.DIM > 0:
-				service.addCharacteristics(HapDeviceBrightnessCharacteristics(device))
+				service.addCharacteristics(HapBrightnessCharacteristics(0))
 			if methods & Device.RGBW > 0:
 				service.addCharacteristics(HapHueCharacteristics())
 				service.addCharacteristics(HapSaturationCharacteristics())
@@ -168,6 +145,14 @@ class HapDeviceAccessory(HapAccessory):
 			r,g,b = colorsys.hsv_to_rgb(hue/360.0, saturation/100.0, 1)
 			color = int('%02X%02X%02X00' % (r*255, g*255, b*255), 16)
 			self.device.command(Device.RGBW, color, origin='HomeKit')
+		elif HapCharacteristic.TYPE_BRIGHTNESS in types:
+			value = types[HapCharacteristic.TYPE_BRIGHTNESS].value()
+			if value == 100:
+				self.device.command(Device.TURNON, origin='HomeKit')
+			elif value == 0:
+				self.device.command(Device.TURNOFF, origin='HomeKit')
+			else:
+				self.device.command(Device.DIM, int(round(value/100.0*255.0)), origin='HomeKit')
 
 class HomeKit(Plugin):
 	implements(IDeviceChange)
