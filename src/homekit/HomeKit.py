@@ -10,7 +10,7 @@ from threading import Thread
 from urlparse import urlparse, parse_qsl
 
 from HapAccessory import HapAccessory, HapService
-from HapCharacteristics import HapCharacteristic, HapHueCharacteristics
+from HapCharacteristics import HapCharacteristic, HapHueCharacteristics, HapSaturationCharacteristics
 import random
 import ed25519
 

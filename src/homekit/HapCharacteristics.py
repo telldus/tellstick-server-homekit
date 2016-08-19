@@ -4,6 +4,7 @@ import logging
 
 class HapCharacteristic(object):
 	TYPE_HUE = '13'
+	TYPE_SATURATION = '2F'
 
 	def __init__(self, value = None, **kwargs):
 		self.properties = kwargs
@@ -52,4 +53,16 @@ class HapHueCharacteristics(HapCharacteristic):
 			maxValue=360,
 			minStep=1,
 			unit='arcdegrees'
+		)
+
+class HapSaturationCharacteristics(HapCharacteristic):
+	def __init__(self):
+		super(HapSaturationCharacteristics,self).__init__(
+			value=0,
+			type=HapCharacteristic.TYPE_SATURATION,
+			perms=['pr', 'pw', 'ev'],
+			minValue=0,
+			maxValue=100,
+			minStep=1,
+			unit='percentage'
 		)
