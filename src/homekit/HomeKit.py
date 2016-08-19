@@ -105,7 +105,7 @@ class HapDeviceAccessory(HapAccessory):
 			service = HapService('43')
 			service.addCharacteristics(OnCharacteristics(device))
 			if methods & Device.DIM > 0:
-				service.addCharacteristics(HapBrightnessCharacteristics(0))
+				service.addCharacteristics(BrightnessCharacteristics(device))
 			if methods & Device.RGBW > 0:
 				service.addCharacteristics(HapHueCharacteristics())
 				service.addCharacteristics(HapSaturationCharacteristics())
