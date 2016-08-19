@@ -28,7 +28,7 @@ class HapCharacteristic(object):
 		self.properties['value'] = value
 
 	def value(self):
-		self.properties.get('value', None)
+		return self.properties.get('value', None)
 
 	def __getitem__(self, attr):
 		if attr == 'value':
