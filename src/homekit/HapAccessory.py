@@ -91,5 +91,8 @@ class HapAccessory(object):
 			if c is not None:
 				return c
 
+	def characteristicsWasUpdated(self, iids):
+		pass
+
 	def servicesJSON(self):
 		return [{'type': self.services[i].type, 'iid': self.services[i].iid, 'characteristics': self.services[i].characteristicsJSON()} for i in self.services]

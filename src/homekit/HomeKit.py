@@ -234,6 +234,7 @@ class HomeKit(Plugin):
 	def handleCharacteristicsPut(self, request, body):
 		if 'characteristics' not in body:
 			return
+		updatedAids = {}
 		for c in body['characteristics']:
 			if 'aid' not in c or 'iid' not in c or 'value' not in c:
 				continue
@@ -247,7 +248,10 @@ class HomeKit(Plugin):
 				logging.error("Could not find characteristic")
 				return
 			characteristic.setValue(c['value'])
+			updatedAids.setdefault(aid, []).append(iid)
 		request.sendEncryptedResponse('', '204 No Content')
+		for aid in updatedAids:
+			self.accessories[aid].characteristicsWasUpdated(updatedAids[aid])
 
 	def newConnection(self, conn):
 		if self.longTermKey is None or self.password is None:
