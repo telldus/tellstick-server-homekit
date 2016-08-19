@@ -16,7 +16,7 @@ import ed25519
 
 import logging
 import json
-
+import colorsys
 
 class RequestHandler(HapHandler):
 	def finish(self):
@@ -140,17 +140,34 @@ class HapDeviceAccessory(HapAccessory):
 		super(HapDeviceAccessory,self).__init__('Acme', device.typeString(), device.name(), device.id())
 		self.device = device
 		methods = device.methods()
-		if (methods & Device.DIM > 0):
-			# Supports Dim - Type=Bulb
+		if methods & (Device.DIM | Device.RGBW) > 0:
+			# Supports Dim/RGBW - Type=Bulb
 			service = HapService('43')
 			service.addCharacteristics(HapDeviceOnCharacteristics(device))
-			service.addCharacteristics(HapDeviceBrightnessCharacteristics(device))
+			if methods & Device.DIM > 0:
+				service.addCharacteristics(HapDeviceBrightnessCharacteristics(device))
+			if methods & Device.RGBW > 0:
+				service.addCharacteristics(HapHueCharacteristics())
+				service.addCharacteristics(HapSaturationCharacteristics())
 			self.addService(service)
-		elif (methods & (Device.TURNON | Device.TURNOFF) > 0):
+		elif methods & (Device.TURNON | Device.TURNOFF) > 0:
 			# Supports On/Off - Type=Switch
 			service = HapService('49')
 			service.addCharacteristics(HapDeviceOnCharacteristics(device))
 			self.addService(service)
+
+	def characteristicsWasUpdated(self, iids):
+		# Convert iids to types
+		types = {}
+		for iid in iids:
+			c = self.characteristic(iid)
+			types[c['type']] = c
+		if HapCharacteristic.TYPE_HUE in types or HapCharacteristic.TYPE_SATURATION in types:
+			hue = types[HapCharacteristic.TYPE_HUE].value()
+			saturation = types[HapCharacteristic.TYPE_SATURATION].value()
+			r,g,b = colorsys.hsv_to_rgb(hue/360.0, saturation/100.0, 1)
+			color = int('%02X%02X%02X00' % (r*255, g*255, b*255), 16)
+			self.device.command(Device.RGBW, color, origin='HomeKit')
 
 class HomeKit(Plugin):
 	implements(IDeviceChange)
