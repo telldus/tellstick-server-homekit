@@ -3,6 +3,7 @@
 import logging
 
 class HapCharacteristic(object):
+	TYPE_BRIGHTNESS = '8'
 	TYPE_HUE = '13'
 	TYPE_ON = '25'
 	TYPE_SATURATION = '2F'
@@ -52,6 +53,19 @@ class HapCharacteristic(object):
 			self.setValue(value)
 		else:
 			self.properties[attr] = value
+
+class HapBrightnessCharacteristics(HapCharacteristic):
+	def __init__(self, initialValue):
+		super(HapBrightnessCharacteristics,self).__init__(
+			value=initialValue,
+			type=HapCharacteristic.TYPE_BRIGHTNESS,
+			perms=['pr', 'pw', 'ev'],
+			minValue=0,
+			maxValue=100,
+			minStep=1,
+			unit='percentage',
+			format='int'
+		)
 
 class HapHueCharacteristics(HapCharacteristic):
 	def __init__(self):
