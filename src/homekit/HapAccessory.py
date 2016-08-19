@@ -15,6 +15,8 @@ class HapCharacteristic(object):
 			self.properties['format'] = 'bool'
 		elif type(value) == int:
 			self.properties['format'] = 'int'
+		elif type(value) == float:
+			self.properties['format'] = 'float'
 		else:
 			logging.error('Unkown HAP characteristic type %s', type(value))
 
