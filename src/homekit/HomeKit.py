@@ -260,7 +260,9 @@ class HomeKit(Plugin):
 	def deviceAdded(self, device):
 		if device.isDevice() == False:
 			return
-		i = max(self.accessories)+1
+		# Use the deviceId as accessory id since it must persist over reboots.
+		# ait=1 is already taken by TellStick so offset them by one
+		i = device.id() + 1
 		self.accessories[i] = HapDeviceAccessory(device)
 
 	# IDeviceChange
