@@ -9,7 +9,8 @@ from SocketServer import TCPServer, ThreadingMixIn
 from threading import Thread
 from urlparse import urlparse, parse_qsl
 
-from HapAccessory import HapAccessory, HapCharacteristic, HapService
+from HapAccessory import HapAccessory, HapService
+from HapCharacteristic import HapCharacteristic
 import random
 import ed25519
 
