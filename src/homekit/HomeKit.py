@@ -128,7 +128,7 @@ class HapDeviceAccessory(HapAccessory):
 			r,g,b = colorsys.hsv_to_rgb(hue/360.0, saturation/100.0, 1)
 			color = int('%02X%02X%02X00' % (r*255, g*255, b*255), 16)
 			self.device.command(Device.RGBW, color, origin='HomeKit')
-		elif HapCharacteristic.TYPE_BRIGHTNESS in types:
+		if HapCharacteristic.TYPE_BRIGHTNESS in types:
 			value = types[HapCharacteristic.TYPE_BRIGHTNESS].value()
 			if value == 100:
 				self.device.command(Device.TURNON, origin='HomeKit')
