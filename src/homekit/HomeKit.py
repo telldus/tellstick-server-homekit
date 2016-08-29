@@ -19,10 +19,10 @@ import logging
 import json
 import colorsys
 
-class RequestHandler(HapHandler):
+class HapConnection(HapHandler):
 	def finish(self):
 		HapHandler.finish(self)
-		RequestHandler.HTTPDServer.lostConnection(self)
+		HapConnection.HTTPDServer.lostConnection(self)
 
 	def addPairing(self, identifier, publicKey, permissions):
 		return self.hk.addPairing(identifier, publicKey, permissions)
@@ -53,22 +53,23 @@ class RequestHandler(HapHandler):
 	def do_encrypted_PUT(self):
 		if self.path == '/characteristics':
 			data = json.loads(self.parsedRequest)
+			logging.warning('Encrypted PUT to %s: %s', self.path, data)
 			self.hk.handleCharacteristicsPut(self, data)
 
 	def setup(self):
 		HapHandler.setup(self)
-		RequestHandler.HTTPDServer.newConnection(self)
-		self.hk = HomeKit(RequestHandler.HTTPDServer.context)
+		HapConnection.HTTPDServer.newConnection(self)
+		self.hk = HomeKit(HapConnection.HTTPDServer.context)
 
 class ThreadedTCPServer(ThreadingMixIn, TCPServer):
 	daemon_threads = True
 
 class HTTPDServer(object):
 	def __init__(self, port, context):
-		RequestHandler.HTTPDServer = self
+		HapConnection.HTTPDServer = self
 		self.context = context
 		self.connections = []
-		self.httpServer = ThreadedTCPServer(('', port), RequestHandler)
+		self.httpServer = ThreadedTCPServer(('', port), HapConnection)
 		self.thread = Thread(target=self.httpServer.serve_forever, name='HomeKit http server')
 		self.thread.daemon = True
 		self.thread.start()
