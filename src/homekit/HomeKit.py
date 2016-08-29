@@ -27,6 +27,16 @@ class HapConnection(HapHandler):
 	def addPairing(self, identifier, publicKey, permissions):
 		return self.hk.addPairing(identifier, publicKey, permissions)
 
+	def deviceAdded(self, device):
+		if device.isDevice() == False:
+			# Ignore sensors for now
+			return
+
+		# Use the deviceId as accessory id since it must persist over reboots.
+		# ait=1 is already taken by TellStick so offset them by one
+		i = device.id() + 1
+		self.accessories[i] = HapDeviceAccessory(device)
+
 	def removePairing(self, identifier):
 		return self.hk.removePairing(identifier)
 
@@ -45,21 +55,84 @@ class HapConnection(HapHandler):
 		logging.warning('Encrypted GET to %s', self.path)
 		url = urlparse(self.path)
 		if url.path == '/accessories':
-			self.hk.handleAccessories(self)
+			accessories = [{'aid': i, 'services': self.accessories[i].servicesJSON()} for i in self.accessories]
+			self.sendEncryptedResponse({'accessories': accessories})
 		elif url.path == '/characteristics':
 			self.query = dict(parse_qsl(url.query))
-			self.hk.handleCharacteristicsGet(self)
+			self.handleCharacteristicsGet()
 
 	def do_encrypted_PUT(self):
 		if self.path == '/characteristics':
 			data = json.loads(self.parsedRequest)
 			logging.warning('Encrypted PUT to %s: %s', self.path, data)
-			self.hk.handleCharacteristicsPut(self, data)
+			self.handleCharacteristicsPut(data)
+
+	def handleCharacteristicsGet(self):
+		if 'id' not in self.query:
+			self.sendEncryptedResponse('', '400 Bad request')
+			return
+		retval = []
+		errorFound = False
+		ids = self.query['id'].split(',')
+		for idPath in ids:
+			path = idPath.split('.')
+			if len(path) != 2:
+				return
+			aid = int(path[0])
+			iid = int(path[1])
+			if aid not in self.accessories:
+				retval.append({'aid': aid, 'iid': iid, 'status': 1})
+				errorFound = True
+				continue
+			accessory = self.accessories[aid]
+			characteristic = accessory.characteristic(iid)
+			if not characteristic:
+				retval.append({'aid': aid, 'iid': iid, 'status': 2})
+				errorFound = True
+				continue
+			retval.append({'aid': aid, 'iid': iid, 'value': characteristic['value']})
+		if errorFound:
+			for c in retval:
+				if 'status' not in c:
+					c['status'] = 0
+		self.sendEncryptedResponse({'characteristics': retval})
+
+	def handleCharacteristicsPut(self, body):
+		if 'characteristics' not in body:
+			return
+		updatedAids = {}
+		for c in body['characteristics']:
+			if 'aid' not in c or 'iid' not in c or 'value' not in c:
+				continue
+			aid = int(c['aid'])
+			iid = int(c['iid'])
+			if aid not in self.accessories:
+				logging.warning("Could not find accessory %s in %s", aid, self.accessories)
+				continue
+			characteristic = self.accessories[aid].characteristic(iid)
+			if not characteristic:
+				logging.error("Could not find characteristic")
+				return
+			characteristic.setValue(c['value'])
+			updatedAids.setdefault(aid, []).append(iid)
+		self.sendEncryptedResponse('', '204 No Content')
+		for aid in updatedAids:
+			self.accessories[aid].characteristicsWasUpdated(updatedAids[aid])
+
+	def loadAccessories(self):
+		self.accessories = {}
+		self.accessories[1] = HapBridgeAccessory()
+		deviceManager = DeviceManager(HapConnection.HTTPDServer.context)
+		for device in deviceManager.retrieveDevices():
+			if not device.confirmed():
+				continue
+			self.deviceAdded(device)
 
 	def setup(self):
 		HapHandler.setup(self)
 		HapConnection.HTTPDServer.newConnection(self)
 		self.hk = HomeKit(HapConnection.HTTPDServer.context)
+		self.loadAccessories()
 
 class ThreadedTCPServer(ThreadingMixIn, TCPServer):
 	daemon_threads = True
@@ -149,8 +222,6 @@ class HomeKit(Plugin):
 
 	def __init__(self):
 		Application().queue(self.start)
-		self.accessories = {}
-		self.accessories[1] = HapBridgeAccessory()
 		s = Settings('homekit')
 		self.clients = s.get('clients', {})
 		self.configurationNumber = s.get('configurationNumber', 1)
@@ -162,11 +233,6 @@ class HomeKit(Plugin):
 		sf = 1 if len(self.clients) == 0 else 0
 		self.bonjour = Bonjour(port=self.port, c=self.configurationNumber, sf=sf)
 		self.httpServer = HTTPDServer(port=self.port, context=self.context)
-		deviceManager = DeviceManager(self.context)
-		for device in deviceManager.retrieveDevices():
-			if not device.confirmed():
-				continue
-			self.deviceAdded(device)
 
 	def addPairing(self, identifier, publicKey, permissions):
 		self.clients[identifier] = {
@@ -190,62 +256,6 @@ class HomeKit(Plugin):
 			self.bonjour.updateRecord(sf=1)
 		return True
 
-	def handleAccessories(self, request):
-		accessories = [{'aid': i, 'services': self.accessories[i].servicesJSON()} for i in self.accessories]
-		request.sendEncryptedResponse({'accessories': accessories})
-
-	def handleCharacteristicsGet(self, request):
-		if 'id' not in request.query:
-			request.sendEncryptedResponse('', '400 Bad request')
-			return
-		retval = []
-		errorFound = False
-		ids = request.query['id'].split(',')
-		for idPath in ids:
-			path = idPath.split('.')
-			if len(path) != 2:
-				return
-			aid = int(path[0])
-			iid = int(path[1])
-			if aid not in self.accessories:
-				retval.append({'aid': aid, 'iid': iid, 'status': 1})
-				errorFound = True
-				continue
-			accessory = self.accessories[aid]
-			characteristic = accessory.characteristic(iid)
-			if not characteristic:
-				retval.append({'aid': aid, 'iid': iid, 'status': 2})
-				errorFound = True
-				continue
-			retval.append({'aid': aid, 'iid': iid, 'value': characteristic['value']})
-		if errorFound:
-			for c in retval:
-				if 'status' not in c:
-					c['status'] = 0
-		request.sendEncryptedResponse({'characteristics': retval})
-
-	def handleCharacteristicsPut(self, request, body):
-		if 'characteristics' not in body:
-			return
-		updatedAids = {}
-		for c in body['characteristics']:
-			if 'aid' not in c or 'iid' not in c or 'value' not in c:
-				continue
-			aid = int(c['aid'])
-			iid = int(c['iid'])
-			if aid not in self.accessories:
-				logging.warning("Could not find accessory %s in %s", aid, self.accessories)
-				continue
-			characteristic = self.accessories[aid].characteristic(iid)
-			if not characteristic:
-				logging.error("Could not find characteristic")
-				return
-			characteristic.setValue(c['value'])
-			updatedAids.setdefault(aid, []).append(iid)
-		request.sendEncryptedResponse('', '204 No Content')
-		for aid in updatedAids:
-			self.accessories[aid].characteristicsWasUpdated(updatedAids[aid])
-
 	def newConnection(self, conn):
 		if self.longTermKey is None or self.password is None:
 			# No public key, generate
@@ -259,12 +269,8 @@ class HomeKit(Plugin):
 
 	# IDeviceChange
 	def deviceAdded(self, device):
-		if device.isDevice() == False:
-			return
-		# Use the deviceId as accessory id since it must persist over reboots.
-		# ait=1 is already taken by TellStick so offset them by one
-		i = device.id() + 1
-		self.accessories[i] = HapDeviceAccessory(device)
+		for conn in self.httpServer.connections:
+			conn.deviceAdded(device)
 
 	# IDeviceChange
 	def deviceConfirmed(self, device):
