@@ -38,8 +38,18 @@ class HapConnection(HapHandler):
 		self.accessories[i] = HapDeviceAccessory(device)
 
 	def deviceStateChanged(self, device, state, statevalue):
-		value = True if state == Device.TURNON else False
-		self.updateCharacteristicsValue(device.id() + 1, HapCharacteristic.TYPE_ON, value)
+		values = {}
+		if state == Device.TURNON:
+			values = {
+				HapCharacteristic.TYPE_ON: True
+			}
+		elif state == Device.TURNOFF:
+			values = {
+				HapCharacteristic.TYPE_ON: False
+			}
+		else:
+			return
+		self.updateCharacteristicsValues(device.id() + 1, values)
 
 	def removePairing(self, identifier):
 		return self.hk.removePairing(identifier)
@@ -154,12 +164,13 @@ class HapConnection(HapHandler):
 		self.hk = HomeKit(HapConnection.HTTPDServer.context)
 		self.loadAccessories()
 
-	def updateCharacteristicsValue(self, aid, characteristicType, value):
+	def updateCharacteristicsValues(self, aid, values):
 		eventMsg = []
-		for c in self.findCharacteristicsByType(aid, characteristicType):
-			c.setValue(values[characteristicType])
-			if c['ev'] == True:
-				eventMsg.append({'aid': aid, 'iid': c['iid'], 'value': c.value()})
+		for characteristicType in values:
+			for c in self.findCharacteristicsByType(aid, characteristicType):
+				c.setValue(values[characteristicType])
+				if c['ev'] == True:
+					eventMsg.append({'aid': aid, 'iid': c['iid'], 'value': c.value()})
 		if len(eventMsg) > 0:
 			self.sendEncryptedResponse({'characteristics': eventMsg}, protocol='EVENT/1.0')
 
