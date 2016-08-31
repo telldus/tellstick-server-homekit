@@ -41,11 +41,18 @@ class HapConnection(HapHandler):
 		values = {}
 		if state == Device.TURNON:
 			values = {
-				HapCharacteristic.TYPE_ON: True
+				HapCharacteristic.TYPE_ON: True,
+				HapCharacteristic.TYPE_BRIGHTNESS: 100,
 			}
 		elif state == Device.TURNOFF:
 			values = {
-				HapCharacteristic.TYPE_ON: False
+				HapCharacteristic.TYPE_ON: False,
+				HapCharacteristic.TYPE_BRIGHTNESS: 0,
+			}
+		elif state == Device.DIM:
+			values = {
+				HapCharacteristic.TYPE_ON: True,
+				HapCharacteristic.TYPE_BRIGHTNESS: int(round(statevalue/255.0*100.0)),
 			}
 		else:
 			return
