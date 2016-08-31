@@ -67,6 +67,14 @@ class HapConnection(HapHandler):
 			logging.warning('Encrypted PUT to %s: %s', self.path, data)
 			self.handleCharacteristicsPut(data)
 
+	def findCharacteristicByType(self, aid, serviceType, characteristicType):
+		if aid not in self.accessories:
+			return None
+		service = self.accessories[aid].service(serviceType)
+		if service is None:
+			return None
+		return service.characteristic(characteristicType=characteristicType)
+
 	def handleCharacteristicsGet(self):
 		if 'id' not in self.query:
 			self.sendEncryptedResponse('', '400 Bad request')
