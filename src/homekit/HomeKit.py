@@ -39,7 +39,7 @@ class HapConnection(HapHandler):
 
 	def deviceStateChanged(self, device, state, statevalue):
 		value = True if state == Device.TURNON else False
-		self.updateCharacteristicsValue(device.id() + 1, '49', HapCharacteristic.TYPE_ON, value)
+		self.updateCharacteristicsValue(device.id() + 1, HapCharacteristic.TYPE_ON, value)
 
 	def removePairing(self, identifier):
 		return self.hk.removePairing(identifier)
@@ -71,13 +71,16 @@ class HapConnection(HapHandler):
 			logging.warning('Encrypted PUT to %s: %s', self.path, data)
 			self.handleCharacteristicsPut(data)
 
-	def findCharacteristicByType(self, aid, serviceType, characteristicType):
+	def findCharacteristicsByType(self, aid, characteristicType):
+		retval = []
 		if aid not in self.accessories:
-			return None
-		service = self.accessories[aid].service(serviceType)
-		if service is None:
-			return None
-		return service.characteristic(characteristicType=characteristicType)
+			return retval
+		for i in self.accessories[aid].services:
+			service = self.accessories[aid].services[i]
+			c = service.characteristic(characteristicType=characteristicType)
+			if c is not None:
+				retval.append(c)
+		return retval
 
 	def handleCharacteristicsGet(self):
 		if 'id' not in self.query:
@@ -151,16 +154,14 @@ class HapConnection(HapHandler):
 		self.hk = HomeKit(HapConnection.HTTPDServer.context)
 		self.loadAccessories()
 
-	def updateCharacteristicsValue(self, aid, serviceType, characteristicType, value):
-		c = self.findCharacteristicByType(aid, serviceType, characteristicType)
-		if c is None:
-			return
-		c.setValue(value)
-		if c['ev'] == True:
-			eventMsg = {'characteristics': [
-				{'aid': aid, 'iid': c['iid'], 'value': c.value()}
-			]}
-			self.sendEncryptedResponse(eventMsg, protocol='EVENT/1.0')
+	def updateCharacteristicsValue(self, aid, characteristicType, value):
+		eventMsg = []
+		for c in self.findCharacteristicsByType(aid, characteristicType):
+			c.setValue(values[characteristicType])
+			if c['ev'] == True:
+				eventMsg.append({'aid': aid, 'iid': c['iid'], 'value': c.value()})
+		if len(eventMsg) > 0:
+			self.sendEncryptedResponse({'characteristics': eventMsg}, protocol='EVENT/1.0')
 
 class ThreadedTCPServer(ThreadingMixIn, TCPServer):
 	daemon_threads = True
