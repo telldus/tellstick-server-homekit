@@ -12,10 +12,16 @@ class HapService(object):
 	def addCharacteristics(self, characteristics):
 		self.characteristics.append(characteristics)
 
-	def characteristic(self, iid):
+	def characteristic(self, iid=None, characteristicType=None):
+		if iid is None and characteristicType is None:
+			# Must search by at least one criteria
+			return None
 		for c in self.characteristics:
-			if c['iid'] == iid:
-				return c
+			if iid is not None and c['iid'] != iid:
+				continue
+			if characteristicType is not None and c['type'] != characteristicType:
+				continue
+			return c
 		return None
 
 	def characteristicsJSON(self):
