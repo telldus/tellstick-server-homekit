@@ -102,7 +102,9 @@ class HapConnection(HapHandler):
 				retval.append({'aid': aid, 'iid': iid, 'status': 2})
 				errorFound = True
 				continue
-			retval.append({'aid': aid, 'iid': iid, 'value': characteristic['value']})
+			data = {'aid': aid, 'iid': iid, 'value': characteristic['value']}
+			# TODO: Check if the parameters meta, perms, type and/or ev was requested and return those too
+			retval.append(data)
 		if errorFound:
 			for c in retval:
 				if 'status' not in c:
