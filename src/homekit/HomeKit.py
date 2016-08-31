@@ -37,6 +37,10 @@ class HapConnection(HapHandler):
 		i = device.id() + 1
 		self.accessories[i] = HapDeviceAccessory(device)
 
+	def deviceStateChanged(self, device, state, statevalue):
+		value = True if state == Device.TURNON else False
+		self.updateCharacteristicsValue(device.id() + 1, '49', HapCharacteristic.TYPE_ON, value)
+
 	def removePairing(self, identifier):
 		return self.hk.removePairing(identifier)
 
@@ -110,7 +114,7 @@ class HapConnection(HapHandler):
 			return
 		updatedAids = {}
 		for c in body['characteristics']:
-			if 'aid' not in c or 'iid' not in c or 'value' not in c:
+			if 'aid' not in c or 'iid' not in c:
 				continue
 			aid = int(c['aid'])
 			iid = int(c['iid'])
@@ -121,8 +125,11 @@ class HapConnection(HapHandler):
 			if not characteristic:
 				logging.error("Could not find characteristic")
 				return
-			characteristic.setValue(c['value'])
-			updatedAids.setdefault(aid, []).append(iid)
+			if 'value' in c:
+				characteristic.setValue(c['value'])
+				updatedAids.setdefault(aid, []).append(iid)
+			if 'ev' in c:
+				characteristic['ev'] = c['ev']
 		self.sendEncryptedResponse('', '204 No Content')
 		for aid in updatedAids:
 			self.accessories[aid].characteristicsWasUpdated(updatedAids[aid])
@@ -141,6 +148,17 @@ class HapConnection(HapHandler):
 		HapConnection.HTTPDServer.newConnection(self)
 		self.hk = HomeKit(HapConnection.HTTPDServer.context)
 		self.loadAccessories()
+
+	def updateCharacteristicsValue(self, aid, serviceType, characteristicType, value):
+		c = self.findCharacteristicByType(aid, serviceType, characteristicType)
+		if c is None:
+			return
+		c.setValue(value)
+		if c['ev'] == True:
+			eventMsg = {'characteristics': [
+				{'aid': aid, 'iid': c['iid'], 'value': c.value()}
+			]}
+			self.sendEncryptedResponse(eventMsg, protocol='EVENT/1.0')
 
 class ThreadedTCPServer(ThreadingMixIn, TCPServer):
 	daemon_threads = True
@@ -283,3 +301,8 @@ class HomeKit(Plugin):
 	# IDeviceChange
 	def deviceConfirmed(self, device):
 		self.deviceAdded(device)
+
+	# IDeviceChange
+	def stateChanged(self, device, state, statevalue):
+		for conn in self.httpServer.connections:
+			conn.deviceStateChanged(device, state, statevalue)
