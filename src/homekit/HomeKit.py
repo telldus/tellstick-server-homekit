@@ -175,7 +175,10 @@ class HapConnection(HapHandler):
 		eventMsg = []
 		for characteristicType in values:
 			for c in self.findCharacteristicsByType(aid, characteristicType):
-				c.setValue(values[characteristicType])
+				value = values[characteristicType]
+				if value == c.value():
+					continue
+				c.setValue(value)
 				if c['ev'] == True:
 					eventMsg.append({'aid': aid, 'iid': c['iid'], 'value': c.value()})
 		if len(eventMsg) > 0:
