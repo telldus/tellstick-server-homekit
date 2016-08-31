@@ -249,6 +249,7 @@ class HomeKit(Plugin):
 	implements(IDeviceChange)
 
 	def __init__(self):
+		self.httpServer = None
 		Application().queue(self.start)
 		s = Settings('homekit')
 		self.clients = s.get('clients', {})
@@ -297,6 +298,9 @@ class HomeKit(Plugin):
 
 	# IDeviceChange
 	def deviceAdded(self, device):
+		if self.httpServer is None:
+			# Too early, we have not started yet
+			return
 		for conn in self.httpServer.connections:
 			conn.deviceAdded(device)
 
