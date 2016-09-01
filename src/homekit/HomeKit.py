@@ -324,13 +324,25 @@ class HomeKit(Plugin):
 			s['password'] = self.password
 		conn.setLongTermKey(self.longTermKey, self.password)
 
+	def increaseConfigurationNumber(self):
+		self.configurationNumber += 1
+		if self.configurationNumber >= 4294967295:
+			self.configurationNumber = 1
+		s = Settings('homekit')
+		s['configurationNumber'] = self.configurationNumber
+		self.bonjour.updateRecord(c=self.configurationNumber)
+
 	# IDeviceChange
 	def deviceAdded(self, device):
 		if self.httpServer is None:
 			# Too early, we have not started yet
 			return
+		if len(self.httpServer.connections) == 0:
+			# No connections, ignore
+			return
 		for conn in self.httpServer.connections:
 			conn.deviceAdded(device)
+		self.increaseConfigurationNumber()
 
 	# IDeviceChange
 	def deviceConfirmed(self, device):
