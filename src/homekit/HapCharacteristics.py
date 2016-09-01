@@ -37,9 +37,13 @@ class HapCharacteristic(object):
 			return str(value)
 		if self.properties['format'] == 'bool':
 			return bool(value)
-		if self.properties['format'] == 'int':
-			return int(value)
-		if self.properties['format'] == 'float':
+		if self.properties['format'] == 'int' or self.properties['format'] == 'float':
+			value = float(value)
+			if 'minStep' in self.properties:
+				# Respect minStep
+				value = round(value/self.properties['minStep'])*self.properties['minStep']
+			if self.properties['format'] == 'int':
+				return int(value)
 			return float(value)
 		return value
 
