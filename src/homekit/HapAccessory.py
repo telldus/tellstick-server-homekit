@@ -53,9 +53,9 @@ class HapAccessory(object):
 		service.setIid(self.iid)
 		self.iid = self.services[self.iid].maxIid() + 1
 
-	def characteristic(self, iid):
+	def characteristic(self, iid=None, characteristicType=None):
 		for service in self.services:
-			c = self.services[service].characteristic(iid)
+			c = self.services[service].characteristic(iid=iid, characteristicType=characteristicType)
 			if c is not None:
 				return c
 

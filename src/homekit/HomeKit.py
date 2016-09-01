@@ -247,8 +247,14 @@ class HapDeviceAccessory(HapAccessory):
 			c = self.characteristic(iid)
 			types[c['type']] = c
 		if HapCharacteristic.TYPE_HUE in types or HapCharacteristic.TYPE_SATURATION in types:
-			hue = types[HapCharacteristic.TYPE_HUE].value()
-			saturation = types[HapCharacteristic.TYPE_SATURATION].value()
+			if HapCharacteristic.TYPE_HUE in types:
+				hue = types[HapCharacteristic.TYPE_HUE].value()
+			else:
+				hue = self.characteristic(characteristicType=HapCharacteristic.TYPE_HUE).value()
+			if HapCharacteristic.TYPE_SATURATION in types:
+				saturation = types[HapCharacteristic.TYPE_SATURATION].value()
+			else:
+				saturation = self.characteristic(characteristicType=HapCharacteristic.TYPE_SATURATION).value()
 			r,g,b = colorsys.hsv_to_rgb(hue/360.0, saturation/100.0, 1)
 			color = int('%02X%02X%02X00' % (r*255, g*255, b*255), 16)
 			self.device.command(Device.RGBW, color, origin='HomeKit')
