@@ -472,20 +472,23 @@ class HapHandler(SimpleHTTPRequestHandler):
 			len(msg),
 			msg
 		)
-		l = len(output)
-		addData = [l&0xFF, (l>>8)&0xFF]
-		nonce = []
-		noneVal = self.sendCounter
-		for i in range(8):
-			nonce.append(chr(noneVal & 0xFF))
-			noneVal >>= 8
-		nonce = ''.join(nonce)
-		ciphertext, mac = HapHandler.encryptAndSeal(self.sessionStorage['readKey'], nonce, [ord(x) for x in output], addData=addData)
+		while len(output):
+			d = output[:1024]
+			output = output[1024:]
+			l = len(d)
+			addData = [l&0xFF, (l>>8)&0xFF]
+			nonce = []
+			noneVal = self.sendCounter
+			for i in range(8):
+				nonce.append(chr(noneVal & 0xFF))
+				noneVal >>= 8
+			nonce = ''.join(nonce)
+			ciphertext, mac = HapHandler.encryptAndSeal(self.sessionStorage['readKey'], nonce, [ord(x) for x in d], addData=addData)
 
-		r = addData + ciphertext + mac
-		encryptedRequest = ''.join([chr(x) for x in r])
-		self.wfile.write(encryptedRequest)
-		self.sendCounter = self.sendCounter + 1
+			r = addData + ciphertext + mac
+			encryptedRequest = ''.join([chr(x) for x in r])
+			self.wfile.write(encryptedRequest)
+			self.sendCounter = self.sendCounter + 1
 
 	def setLongTermKey(self, key, password):
 		self.longTermKey = key
