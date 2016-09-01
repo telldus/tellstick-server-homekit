@@ -4,6 +4,7 @@ import logging
 
 class HapCharacteristic(object):
 	TYPE_BRIGHTNESS = '8'
+	TYPE_CURRENT_TEMPERATURE = '11'
 	TYPE_HUE = '13'
 	TYPE_ON = '25'
 	TYPE_SATURATION = '2F'
@@ -70,6 +71,20 @@ class HapBrightnessCharacteristics(HapCharacteristic):
 			unit='percentage',
 			format='int'
 		)
+
+class HapCurrentTemperatureCharacteristics(HapCharacteristic):
+	def __init__(self, initialValue):
+		super(HapCurrentTemperatureCharacteristics,self).__init__(
+			value=initialValue,
+			type=HapCharacteristic.TYPE_CURRENT_TEMPERATURE,
+			perms=['pr', 'ev'],
+			minValue=0,
+			maxValue=100,
+			minStep=0.1,
+			unit='celsius',
+			format='float'
+		)
+
 
 class HapHueCharacteristics(HapCharacteristic):
 	def __init__(self):

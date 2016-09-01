@@ -9,8 +9,8 @@ from SocketServer import TCPServer, ThreadingMixIn
 from threading import Thread
 from urlparse import urlparse, parse_qsl
 
-from HapAccessory import HapAccessory
-from HapCharacteristics import HapCharacteristic
+from HapAccessory import HapAccessory, HapService
+from HapCharacteristics import HapCharacteristic, HapCurrentTemperatureCharacteristics
 from HapDeviceAccessory import HapDeviceAccessory
 import random
 import ed25519
@@ -27,9 +27,6 @@ class HapConnection(HapHandler):
 		return self.hk.addPairing(identifier, publicKey, permissions)
 
 	def deviceAdded(self, device):
-		if device.isDevice() == False:
-			# Ignore sensors for now
-			return
 		if len(self.accessories) >= 100:
 			# HomeKit only supports 100 accessories
 			return
@@ -38,6 +35,13 @@ class HapConnection(HapHandler):
 		# ait=1 is already taken by TellStick so offset them by one
 		i = device.id() + 1
 		self.accessories[i] = HapDeviceAccessory(device)
+		if device.isSensor():
+			# Load sensor values dynamically since we might not always now all the types
+			# initially
+			values = device.sensorValues()
+			for valueType in values:
+				for v in values[valueType]:
+					self.sensorValueUpdated(device, valueType, v['value'], v['scale'])
 
 	def deviceStateChanged(self, device, state, statevalue):
 		values = {}
@@ -167,6 +171,32 @@ class HapConnection(HapHandler):
 			)
 		return retval
 
+	def sensorValueUpdated(self, device, valueType, value, scale):
+		aid = device.id() + 1
+		if aid not in self.accessories:
+			return
+		if valueType == Device.TEMPERATURE:
+			if scale != Device.SCALE_TEMPERATURE_CELCIUS:
+				# Only celcius supported
+				return False
+			characteristicType = HapCharacteristic.TYPE_CURRENT_TEMPERATURE
+			cObject = HapCurrentTemperatureCharacteristics
+			serviceType = '8A'
+		else:
+			return
+		c = self.findCharacteristicsByType(aid, characteristicType)
+		if len(c) == 0:
+			accessory = self.accessories[aid]
+			service = HapService(serviceType)
+			service.addCharacteristics(cObject(value))
+			accessory.addService(service)
+			return True  # New value
+		values = {
+			characteristicType: value,
+		}
+		self.updateCharacteristicsValues(aid, values)
+		return False
+
 	def setup(self):
 		HapHandler.setup(self)
 		HapConnection.HTTPDServer.newConnection(self)
@@ -295,6 +325,18 @@ class HomeKit(Plugin):
 	# IDeviceChange
 	def deviceConfirmed(self, device):
 		self.deviceAdded(device)
+
+	# IDeviceChange
+	def sensorValueUpdated(self, device, valueType, value, scale):
+		if self.httpServer is None:
+			# Too early, we have not started yet
+			return
+		newValue = False
+		for conn in self.httpServer.connections:
+			if conn.sensorValueUpdated(device, valueType, value, scale):
+				newValue = True
+		if newValue:
+			self.increaseConfigurationNumber()
 
 	# IDeviceChange
 	def stateChanged(self, device, state, statevalue):
