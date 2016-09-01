@@ -31,6 +31,9 @@ class HapConnection(HapHandler):
 		if device.isDevice() == False:
 			# Ignore sensors for now
 			return
+		if len(self.accessories) >= 100:
+			# HomeKit only supports 100 accessories
+			return
 
 		# Use the deviceId as accessory id since it must persist over reboots.
 		# ait=1 is already taken by TellStick so offset them by one
