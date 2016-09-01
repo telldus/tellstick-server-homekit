@@ -61,20 +61,6 @@ class HapConnection(HapHandler):
 			return
 		self.updateCharacteristicsValues(device.id() + 1, values)
 
-	def removePairing(self, identifier):
-		return self.hk.removePairing(identifier)
-
-	def retrievePairings(self):
-		retval = []
-		clients = self.hk.clients
-		for identifier in clients:
-			retval.append({
-				'identifier': identifier,
-				'publicKey': clients[identifier]['publicKey'],
-				'permissions': clients[identifier]['admin']}
-			)
-		return retval
-
 	def do_encrypted_GET(self):
 		logging.warning('Encrypted GET to %s', self.path)
 		url = urlparse(self.path)
@@ -167,6 +153,20 @@ class HapConnection(HapHandler):
 			if not device.confirmed():
 				continue
 			self.deviceAdded(device)
+
+	def removePairing(self, identifier):
+		return self.hk.removePairing(identifier)
+
+	def retrievePairings(self):
+		retval = []
+		clients = self.hk.clients
+		for identifier in clients:
+			retval.append({
+				'identifier': identifier,
+				'publicKey': clients[identifier]['publicKey'],
+				'permissions': clients[identifier]['admin']}
+			)
+		return retval
 
 	def setup(self):
 		HapHandler.setup(self)
