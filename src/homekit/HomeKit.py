@@ -181,11 +181,11 @@ class HapConnection(HapHandler):
 				return False
 			characteristicType = HapCharacteristic.TYPE_CURRENT_TEMPERATURE
 			cObject = HapCurrentTemperatureCharacteristics
-			serviceType = '8A'
+			serviceType = HapService.TYPE_TEMPERATURE_SENSOR
 		elif valueType == Device.HUMIDITY:
 			characteristicType = HapCharacteristic.TYPE_CURRENT_RELATIVE_HUMIDITY
 			cObject = HapCurrentRelativeHumidityCharacteristics
-			serviceType = '82'
+			serviceType = HapService.TYPE_HUMIDITY_SENSOR
 		else:
 			return
 		c = self.findCharacteristicsByType(aid, characteristicType)

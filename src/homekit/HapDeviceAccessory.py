@@ -14,7 +14,7 @@ class HapDeviceAccessory(HapAccessory):
 		methods = device.methods()
 		if methods & (Device.DIM | Device.RGBW) > 0:
 			# Supports Dim/RGBW - Type=Bulb
-			service = HapService('43')
+			service = HapService(HapService.TYPE_LIGHTBULB)
 			service.addCharacteristics(OnCharacteristics(device))
 			if methods & Device.DIM > 0:
 				service.addCharacteristics(BrightnessCharacteristics(device))
@@ -24,7 +24,7 @@ class HapDeviceAccessory(HapAccessory):
 			self.addService(service)
 		elif methods & (Device.TURNON | Device.TURNOFF) > 0:
 			# Supports On/Off - Type=Switch
-			service = HapService('49')
+			service = HapService(HapService.TYPE_SWITCH)
 			service.addCharacteristics(OnCharacteristics(device))
 			self.addService(service)
 

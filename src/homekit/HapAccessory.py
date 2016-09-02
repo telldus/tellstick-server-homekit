@@ -4,6 +4,11 @@ import logging
 from HapCharacteristics import HapCharacteristic
 
 class HapService(object):
+	TYPE_HUMIDITY_SENSOR = '82'
+	TYPE_LIGHTBULB = '43'
+	TYPE_SWITCH = '49'
+	TYPE_TEMPERATURE_SENSOR = '8A'
+
 	def __init__(self, serviceType):
 		self.type = serviceType
 		self.iid = int(serviceType, 16)*1000
