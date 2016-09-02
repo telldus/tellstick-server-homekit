@@ -43,6 +43,11 @@ class HapConnection(HapHandler):
 				for v in values[valueType]:
 					self.sensorValueUpdated(device, valueType, v['value'], v['scale'])
 
+	def deviceRemoved(self, deviceId):
+		aid = deviceId + 1
+		if aid in self.accessories:
+			del self.accessories[aid]
+
 	def deviceStateChanged(self, device, state, statevalue):
 		values = {}
 		if state == Device.TURNON:
@@ -331,6 +336,18 @@ class HomeKit(Plugin):
 	# IDeviceChange
 	def deviceConfirmed(self, device):
 		self.deviceAdded(device)
+
+	# IDeviceChange
+	def deviceRemoved(self, deviceId):
+		if self.httpServer is None:
+			# Too early, we have not started yet
+			return
+		if len(self.httpServer.connections) == 0:
+			# No connections, ignore
+			return
+		for conn in self.httpServer.connections:
+			conn.deviceRemoved(deviceId)
+		self.increaseConfigurationNumber()
 
 	# IDeviceChange
 	def sensorValueUpdated(self, device, valueType, value, scale):
