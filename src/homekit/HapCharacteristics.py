@@ -43,6 +43,10 @@ class HapCharacteristic(object):
 			if 'minStep' in self.properties:
 				# Respect minStep
 				value = round(value/self.properties['minStep'])*self.properties['minStep']
+			if 'minValue' in self.properties:
+				value = max(value, self.properties['minValue'])
+			if 'maxValue' in self.properties:
+				value = min(value, self.properties['maxValue'])
 			if self.properties['format'] == 'int':
 				return int(value)
 			return float(value)
