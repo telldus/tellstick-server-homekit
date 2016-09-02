@@ -1,3 +1,4 @@
 curve25519-donna
 ed25519
 http-parser
+pybonjour
