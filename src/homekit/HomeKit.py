@@ -344,5 +344,8 @@ class HomeKit(Plugin):
 
 	# IDeviceChange
 	def stateChanged(self, device, state, statevalue):
+		if self.httpServer is None:
+			# Too early, we have not started yet
+			return
 		for conn in self.httpServer.connections:
 			conn.deviceStateChanged(device, state, statevalue)
