@@ -6,10 +6,11 @@ from HapCharacteristics import HapCharacteristic
 class HapService(object):
 	def __init__(self, serviceType):
 		self.type = serviceType
-		self.iid = None
+		self.iid = int(serviceType, 16)*1000
 		self.characteristics = []
 
 	def addCharacteristics(self, characteristics):
+		characteristics['iid'] = self.iid + int(characteristics['type'], 16)
 		self.characteristics.append(characteristics)
 
 	def characteristic(self, iid=None, characteristicType=None):
@@ -27,20 +28,11 @@ class HapService(object):
 	def characteristicsJSON(self):
 		return [x.toJSON() for x in self.characteristics]
 
-	def maxIid(self):
-		return max(self.characteristics, key=lambda x: x['iid'])['iid']
-
-	def setIid(self, iid):
-		self.iid = iid
-		for c in self.characteristics:
-			iid += 1
-			c['iid'] = iid
-
 class HapAccessory(object):
 	def __init__(self, manufacturer, model, name, serial):
-		self.iid = 1
 		self.services = {}
 		service = HapService('3E')
+		service.iid = 1  # This service must have iid=1 for some unknown Apple reason
 		service.addCharacteristics(HapCharacteristic(format='bool', type='14', perms=['pw']))  # Identify
 		service.addCharacteristics(HapCharacteristic(manufacturer, type='20', perms=['pr']))   # Manufacturer
 		service.addCharacteristics(HapCharacteristic(model, type='21', perms=['pr']))          # Model
@@ -49,9 +41,7 @@ class HapAccessory(object):
 		self.addService(service)
 
 	def addService(self, service):
-		self.services[self.iid] = service
-		service.setIid(self.iid)
-		self.iid = self.services[self.iid].maxIid() + 1
+		self.services[service.type] = service
 
 	def characteristic(self, iid=None, characteristicType=None):
 		for service in self.services:
@@ -63,10 +53,7 @@ class HapAccessory(object):
 		pass
 
 	def service(self, serviceType):
-		for iid in self.services:
-			if self.services[iid].type == serviceType:
-				return self.services[iid]
-		return None
+		return self.services.get(serviceType, None)
 
 	def servicesJSON(self):
 		return [{'type': self.services[i].type, 'iid': self.services[i].iid, 'characteristics': self.services[i].characteristicsJSON()} for i in self.services]
