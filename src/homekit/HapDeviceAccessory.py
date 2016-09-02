@@ -9,7 +9,7 @@ import colorsys
 
 class HapDeviceAccessory(HapAccessory):
 	def __init__(self, device):
-		super(HapDeviceAccessory,self).__init__('Acme', device.typeString(), device.name(), device.id())
+		super(HapDeviceAccessory,self).__init__('Unknown', device.typeString(), device.name(), device.id())
 		self.device = device
 		methods = device.methods()
 		if methods & (Device.DIM | Device.RGBW) > 0:
