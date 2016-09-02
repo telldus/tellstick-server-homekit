@@ -4,6 +4,7 @@ import logging
 from HapCharacteristics import HapCharacteristic
 
 class HapService(object):
+	TYPE_BATTERY = '96'
 	TYPE_HUMIDITY_SENSOR = '82'
 	TYPE_LIGHTBULB = '43'
 	TYPE_STATELESS_PROGRAMMABLE_SWITCH = '89'

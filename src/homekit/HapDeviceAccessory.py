@@ -32,6 +32,13 @@ class HapDeviceAccessory(HapAccessory):
 			service = HapService(HapService.TYPE_STATELESS_PROGRAMMABLE_SWITCH)
 			service.addCharacteristics(ProgrammableSwitchEventCharacteristics(device))
 			self.addService(service)
+		if device.battery() is not None:
+			level = device.battery().level
+			service = HapService(HapService.TYPE_BATTERY)
+			service.addCharacteristics(HapBatteryLevelCharacteristics(level))
+			service.addCharacteristics(HapChargingStateCharacteristics(0))
+			service.addCharacteristics(HapStatusLowBatteryCharacteristics(0))
+			self.addService(service)
 
 	def characteristicsWasUpdated(self, iids):
 		# Convert iids to types

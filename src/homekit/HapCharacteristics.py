@@ -3,13 +3,16 @@
 import logging
 
 class HapCharacteristic(object):
+	TYPE_BATTERY_LEVEL = '68'
 	TYPE_BRIGHTNESS = '8'
+	TYPE_CHARGING_STATE = '8F'
 	TYPE_CURRENT_RELATIVE_HUMIDITY = '10'
 	TYPE_CURRENT_TEMPERATURE = '11'
 	TYPE_HUE = '13'
 	TYPE_ON = '25'
 	TYPE_PROGRAMMABLE_SWITCH_EVENT = '73'
 	TYPE_SATURATION = '2F'
+	TYPE_STATUS_LOW_BATTERY = '79'
 
 	def __init__(self, value = None, **kwargs):
 		self.properties = kwargs
@@ -65,6 +68,19 @@ class HapCharacteristic(object):
 		else:
 			self.properties[attr] = value
 
+class HapBatteryLevelCharacteristics(HapCharacteristic):
+	def __init__(self, initialValue):
+		super(HapBatteryLevelCharacteristics,self).__init__(
+			value=initialValue,
+			type=HapCharacteristic.TYPE_BATTERY_LEVEL,
+			perms=['pr', 'ev'],
+			minValue=0,
+			maxValue=100,
+			minStep=1,
+			unit='percentage',
+			format='int'
+		)
+
 class HapBrightnessCharacteristics(HapCharacteristic):
 	def __init__(self, initialValue):
 		super(HapBrightnessCharacteristics,self).__init__(
@@ -75,6 +91,18 @@ class HapBrightnessCharacteristics(HapCharacteristic):
 			maxValue=100,
 			minStep=1,
 			unit='percentage',
+			format='int'
+		)
+
+class HapChargingStateCharacteristics(HapCharacteristic):
+	def __init__(self, initialValue):
+		super(HapChargingStateCharacteristics,self).__init__(
+			value=initialValue,
+			type=HapCharacteristic.TYPE_CHARGING_STATE,
+			perms=['pr', 'ev'],
+			minValue=0,
+			maxValue=1,
+			minStep=1,
 			format='int'
 		)
 
@@ -147,4 +175,16 @@ class HapSaturationCharacteristics(HapCharacteristic):
 			maxValue=100,
 			minStep=1,
 			unit='percentage'
+		)
+
+class HapStatusLowBatteryCharacteristics(HapCharacteristic):
+	def __init__(self, initialValue):
+		super(HapStatusLowBatteryCharacteristics,self).__init__(
+			value=initialValue,
+			type=HapCharacteristic.TYPE_STATUS_LOW_BATTERY,
+			perms=['pr', 'ev'],
+			minValue=0,
+			maxValue=1,
+			minStep=1,
+			format='int'
 		)
