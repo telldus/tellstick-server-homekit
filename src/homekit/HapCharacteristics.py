@@ -8,6 +8,7 @@ class HapCharacteristic(object):
 	TYPE_CURRENT_TEMPERATURE = '11'
 	TYPE_HUE = '13'
 	TYPE_ON = '25'
+	TYPE_PROGRAMMABLE_SWITCH_EVENT = '73'
 	TYPE_SATURATION = '2F'
 
 	def __init__(self, value = None, **kwargs):
@@ -123,6 +124,17 @@ class HapOnCharacteristics(HapCharacteristic):
 			format='bool',
 			type=HapCharacteristic.TYPE_ON,
 			perms=['pr', 'pw', 'ev']
+		)
+
+class HapProgrammableSwitchEventCharacteristics(HapCharacteristic):
+	def __init__(self, initialValue):
+		super(HapProgrammableSwitchEventCharacteristics,self).__init__(
+			value=initialValue,
+			type=HapCharacteristic.TYPE_PROGRAMMABLE_SWITCH_EVENT,
+			perms=['pr', 'ev'],
+			minValue=0,
+			maxValue=1,
+			minStep=1,
 		)
 
 class HapSaturationCharacteristics(HapCharacteristic):

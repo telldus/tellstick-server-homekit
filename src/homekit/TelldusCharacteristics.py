@@ -23,3 +23,9 @@ class OnCharacteristics(HapOnCharacteristics):
 		initialValue = True if state != Device.TURNOFF else False
 		super(OnCharacteristics,self).__init__(initialValue)
 
+class ProgrammableSwitchEventCharacteristics(HapProgrammableSwitchEventCharacteristics):
+	def __init__(self, device):
+		state, stateValue = device.state()
+		initialValue = True if state != Device.TURNOFF else False
+		super(ProgrammableSwitchEventCharacteristics,self).__init__(initialValue)
+

@@ -6,6 +6,7 @@ from HapCharacteristics import HapCharacteristic
 class HapService(object):
 	TYPE_HUMIDITY_SENSOR = '82'
 	TYPE_LIGHTBULB = '43'
+	TYPE_STATELESS_PROGRAMMABLE_SWITCH = '89'
 	TYPE_SWITCH = '49'
 	TYPE_TEMPERATURE_SENSOR = '8A'
 

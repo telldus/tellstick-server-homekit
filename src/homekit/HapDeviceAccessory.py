@@ -27,6 +27,11 @@ class HapDeviceAccessory(HapAccessory):
 			service = HapService(HapService.TYPE_SWITCH)
 			service.addCharacteristics(OnCharacteristics(device))
 			self.addService(service)
+		elif methods == 0 and device.isSensor() == False:
+			# No methods but not sensor. Probably magnet switch or motion sensor
+			service = HapService(HapService.TYPE_STATELESS_PROGRAMMABLE_SWITCH)
+			service.addCharacteristics(ProgrammableSwitchEventCharacteristics(device))
+			self.addService(service)
 
 	def characteristicsWasUpdated(self, iids):
 		# Convert iids to types

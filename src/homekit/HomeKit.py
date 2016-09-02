@@ -49,11 +49,13 @@ class HapConnection(HapHandler):
 			values = {
 				HapCharacteristic.TYPE_ON: True,
 				HapCharacteristic.TYPE_BRIGHTNESS: 100,
+				HapCharacteristic.TYPE_PROGRAMMABLE_SWITCH_EVENT: 1
 			}
 		elif state == Device.TURNOFF:
 			values = {
 				HapCharacteristic.TYPE_ON: False,
 				HapCharacteristic.TYPE_BRIGHTNESS: 0,
+				HapCharacteristic.TYPE_PROGRAMMABLE_SWITCH_EVENT: 0
 			}
 		elif state == Device.DIM:
 			values = {
