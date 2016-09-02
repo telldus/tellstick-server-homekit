@@ -4,6 +4,7 @@ import logging
 
 class HapCharacteristic(object):
 	TYPE_BRIGHTNESS = '8'
+	TYPE_CURRENT_RELATIVE_HUMIDITY = '10'
 	TYPE_CURRENT_TEMPERATURE = '11'
 	TYPE_HUE = '13'
 	TYPE_ON = '25'
@@ -74,6 +75,19 @@ class HapBrightnessCharacteristics(HapCharacteristic):
 			minStep=1,
 			unit='percentage',
 			format='int'
+		)
+
+class HapCurrentRelativeHumidityCharacteristics(HapCharacteristic):
+	def __init__(self, initialValue):
+		super(HapCurrentRelativeHumidityCharacteristics,self).__init__(
+			value=initialValue,
+			type=HapCharacteristic.TYPE_CURRENT_RELATIVE_HUMIDITY,
+			perms=['pr', 'ev'],
+			minValue=0,
+			maxValue=100,
+			minStep=1,
+			unit='percentage',
+			format='float'
 		)
 
 class HapCurrentTemperatureCharacteristics(HapCharacteristic):

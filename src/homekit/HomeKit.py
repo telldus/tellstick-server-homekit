@@ -10,7 +10,7 @@ from threading import Thread
 from urlparse import urlparse, parse_qsl
 
 from HapAccessory import HapAccessory, HapService
-from HapCharacteristics import HapCharacteristic, HapCurrentTemperatureCharacteristics
+from HapCharacteristics import *
 from HapDeviceAccessory import HapDeviceAccessory
 import random
 import ed25519
@@ -182,6 +182,10 @@ class HapConnection(HapHandler):
 			characteristicType = HapCharacteristic.TYPE_CURRENT_TEMPERATURE
 			cObject = HapCurrentTemperatureCharacteristics
 			serviceType = '8A'
+		elif valueType == Device.HUMIDITY:
+			characteristicType = HapCharacteristic.TYPE_CURRENT_RELATIVE_HUMIDITY
+			cObject = HapCurrentRelativeHumidityCharacteristics
+			serviceType = '82'
 		else:
 			return
 		c = self.findCharacteristicsByType(aid, characteristicType)
