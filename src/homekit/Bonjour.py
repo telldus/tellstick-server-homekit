@@ -36,7 +36,7 @@ class Bonjour(object):
 			logging.info('  port    = %s', self.port)
 
 	def run(self):
-		name = 'Mickes dator'  # TODO
+		name = 'TellStick'  # TODO
 		self.sdRef = pybonjour.DNSServiceRegister(name = name,
 			regtype = '_hap._tcp',
 			port = self.port,

@@ -260,7 +260,7 @@ class HTTPDServer(object):
 
 class HapBridgeAccessory(HapAccessory):
 	def __init__(self):
-		super(HapBridgeAccessory,self).__init__('Telldus Technologies', Board.product(), 'Mickes dator', HapHandler.getId())
+		super(HapBridgeAccessory,self).__init__('Telldus Technologies', Board.product(), 'TellStick', HapHandler.getId())
 
 class HomeKit(Plugin):
 	implements(IDeviceChange)
