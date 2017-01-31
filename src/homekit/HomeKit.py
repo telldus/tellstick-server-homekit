@@ -304,6 +304,7 @@ class HomeKit(Plugin):
 
 	def newConnection(self, conn):
 		if self.longTermKey is None or self.password is None:
+			s = Settings('homekit')
 			# No public key, generate
 			signingKey, verifyingKey = ed25519.create_keypair()
 			self.longTermKey = signingKey.to_ascii(encoding='hex')
