@@ -156,7 +156,6 @@ class HapConnection(HapHandler):
 			self.accessories[aid].characteristicsWasUpdated(updatedAids[aid])
 
 	def loadAccessories(self):
-		self.accessories = {}
 		self.accessories[1] = HapBridgeAccessory()
 		deviceManager = DeviceManager(HapConnection.HTTPDServer.context)
 		for device in deviceManager.retrieveDevices():
@@ -209,6 +208,7 @@ class HapConnection(HapHandler):
 		return False
 
 	def setup(self):
+		self.accessories = {}
 		HapHandler.setup(self)
 		HapConnection.HTTPDServer.newConnection(self)
 		self.hk = HomeKit(HapConnection.HTTPDServer.context)
