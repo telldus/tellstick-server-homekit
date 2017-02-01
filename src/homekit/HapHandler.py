@@ -437,7 +437,12 @@ class HapHandler(SimpleHTTPRequestHandler):
 				self.send_error(501, 'Unsupported method (%r)' % self.command)
 				return
 			method = getattr(self, mname)
-			method()
+			try:
+				method()
+			except Exception as e:
+				logging.exception(e)
+				self.send_error(500, 'Error during call (%r)' % self.command)
+				return
 			self.wfile.flush()
 		except socket.timeout, e:
 			# a read or a write timed out.Discard this connection
