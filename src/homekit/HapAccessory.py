@@ -37,6 +37,8 @@ class HapService(object):
 
 class HapAccessory(object):
 	def __init__(self, manufacturer, model, name, serial):
+		if name == '':
+			name = 'No name'
 		self.services = {}
 		service = HapService('3E')
 		service.iid = 1  # This service must have iid=1 for some unknown Apple reason
