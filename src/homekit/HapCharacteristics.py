@@ -2,6 +2,11 @@
 
 import logging
 
+# On mips 0.1 might be represented as 0.10000000000000001. This is a workaround.
+class floatWrapper(float):
+	def __repr__(self):
+		return '%.15g' % self
+
 class HapCharacteristic(object):
 	TYPE_BATTERY_LEVEL = '68'
 	TYPE_BRIGHTNESS = '8'
@@ -32,7 +37,7 @@ class HapCharacteristic(object):
 			logging.error('Unkown HAP characteristic type %s', type(value))
 
 	def toJSON(self):
-		return self.properties
+		return {key: self[key] for key in self.properties}
 
 	def setValue(self, value):
 		self.properties['value'] = value
@@ -59,8 +64,13 @@ class HapCharacteristic(object):
 
 	def __getitem__(self, attr):
 		if attr == 'value':
-			return self.value()
-		return self.properties.get(attr, None)
+			v = self.value()
+		else:
+			v = self.properties.get(attr, None)
+		if type(v) == float:
+			# Wrap it
+			return floatWrapper(v)
+		return v
 
 	def __setitem__(self, attr, value):
 		if attr == 'value':
