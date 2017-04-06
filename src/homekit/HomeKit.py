@@ -310,7 +310,7 @@ class HomeKit(Plugin):
 		}
 
 	def start(self):
-		self.port    = random.randint(8000, 8080)
+		self.port    = random.randint(8000, 8079)
 		sf = 1 if len(self.clients) == 0 else 0
 		self.bonjour = Bonjour(port=self.port, c=self.configurationNumber, sf=sf)
 		self.httpServer = HTTPDServer(port=self.port, context=self.context)
