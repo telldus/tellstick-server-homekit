@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 
-from base import Application, Plugin, Settings, implements
+from base import Application, Plugin, configuration, implements, ConfigurationDict, ConfigurationNumber, ConfigurationString
 from board import Board
 from telldus import DeviceManager, IDeviceChange, Device
+from telldus.web import IWebReactHandler, ConfigurationReactComponent
 from Bonjour import Bonjour
 from HapHandler import HapHandler
 from SocketServer import TCPServer, ThreadingMixIn
@@ -17,6 +18,8 @@ import ed25519
 
 import logging
 import json
+
+__name__ = 'HomeKit'
 
 class HapConnection(HapHandler):
 	def finish(self):
@@ -262,17 +265,49 @@ class HapBridgeAccessory(HapAccessory):
 	def __init__(self):
 		super(HapBridgeAccessory,self).__init__('Telldus Technologies', Board.product(), 'TellStick', HapHandler.getId())
 
+@configuration(
+	password = ConfigurationReactComponent(
+		component='homekit',
+		defaultValue=None,
+		writable=False,
+	),
+	clients = ConfigurationDict(
+		hidden=True,
+	),
+	configurationNumber = ConfigurationNumber(
+		defaultValue=1,
+		hidden=True,
+	),
+	longTermKey = ConfigurationString(
+		defaultValue='',
+		readable=False,
+		hidden=True,
+	),
+)
 class HomeKit(Plugin):
 	implements(IDeviceChange)
+	implements(IWebReactHandler)
 
 	def __init__(self):
 		self.httpServer = None
 		Application().queue(self.start)
-		s = Settings('homekit')
-		self.clients = s.get('clients', {})
-		self.configurationNumber = s.get('configurationNumber', 1)
-		self.longTermKey = s.get('longTermKey', None)
-		self.password = s.get('password', None)
+		self.clients = self.config('clients')
+		self.configurationNumber = self.config('configurationNumber')
+		self.longTermKey = self.config('longTermKey')
+		self.password = self.config('password')
+		if self.password is None:
+			# Generate password
+			pw = ''.join([str(random.randint(0,9)) for i in range(8)])
+			self.password = '%s-%s-%s' % (pw[0:3], pw[3:5], pw[5:8])
+			self.setConfig('password', self.password)
+
+	def getReactComponents(self):
+		return {
+			'homekit': {
+				'title': 'HomeKit',
+				'script': 'homekit/homekit.js',
+			}
+		}
 
 	def start(self):
 		self.port    = random.randint(8000, 8080)
@@ -285,8 +320,7 @@ class HomeKit(Plugin):
 			'publicKey': publicKey,
 			'admin': permissions
 		}
-		s = Settings('homekit')
-		s['clients'] = self.clients
+		self.setConfig('clients', self.clients)
 		# Non discoverable
 		self.bonjour.updateRecord(sf=0)
 		return True
@@ -295,31 +329,25 @@ class HomeKit(Plugin):
 		if identifier not in self.clients:
 			return True
 		del self.clients[identifier]
-		s = Settings('homekit')
-		s['clients'] = self.clients
+		self.setConfig('clients', self.clients)
 		if len(self.clients) == 0:
 			# Discoverable again
 			self.bonjour.updateRecord(sf=1)
 		return True
 
 	def newConnection(self, conn):
-		if self.longTermKey is None or self.password is None:
-			s = Settings('homekit')
+		if self.longTermKey == '':
 			# No public key, generate
 			signingKey, verifyingKey = ed25519.create_keypair()
 			self.longTermKey = signingKey.to_ascii(encoding='hex')
-			pw = ''.join([str(random.randint(0,9)) for i in range(8)])
-			self.password = '%s-%s-%s' % (pw[0:3], pw[3:5], pw[5:8])
-			s['longTermKey'] = self.longTermKey
-			s['password'] = self.password
+			self.setConfig('longTermKey', self.longTermKey)
 		conn.setLongTermKey(self.longTermKey, self.password)
 
 	def increaseConfigurationNumber(self):
 		self.configurationNumber += 1
 		if self.configurationNumber >= 4294967295:
 			self.configurationNumber = 1
-		s = Settings('homekit')
-		s['configurationNumber'] = self.configurationNumber
+		self.setConfig('configurationNumber', self.configurationNumber)
 		self.bonjour.updateRecord(c=self.configurationNumber)
 
 	# IDeviceChange
