@@ -492,7 +492,13 @@ class HapHandler(SimpleHTTPRequestHandler):
 
 			r = addData + ciphertext + mac
 			encryptedRequest = ''.join([chr(x) for x in r])
-			self.wfile.write(encryptedRequest)
+			try:
+				self.wfile.write(encryptedRequest)
+			except Exception as e:
+				logging.error("Error writing to socket")
+				logging.exception(e)
+				self.close_connection = 1
+				return
 			self.sendCounter = self.sendCounter + 1
 
 	def setLongTermKey(self, key, password):
