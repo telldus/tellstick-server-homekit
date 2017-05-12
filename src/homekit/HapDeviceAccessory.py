@@ -48,7 +48,7 @@ class HapDeviceAccessory(HapAccessory):
 			service.addCharacteristics(ProgrammableSwitchEventCharacteristics(device))
 			self.addService(service)
 		if device.battery() is not None:
-			level = device.battery().level
+			level = device.battery()
 			service = HapService(HapService.TYPE_BATTERY)
 			service.addCharacteristics(HapBatteryLevelCharacteristics(level))
 			service.addCharacteristics(HapChargingStateCharacteristics(0))
