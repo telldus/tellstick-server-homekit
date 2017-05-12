@@ -2,7 +2,10 @@
 
 from telldus import Device
 
-from HapCharacteristics import *
+from .HapCharacteristics import \
+	HapBrightnessCharacteristics, \
+	HapOnCharacteristics, \
+	HapProgrammableSwitchEventCharacteristics
 
 class BrightnessCharacteristics(HapBrightnessCharacteristics):
 	def __init__(self, device):
@@ -15,17 +18,16 @@ class BrightnessCharacteristics(HapBrightnessCharacteristics):
 			initialValue = 0
 		else:
 			initialValue = 100
-		super(BrightnessCharacteristics,self).__init__(initialValue)
+		super(BrightnessCharacteristics, self).__init__(initialValue)
 
 class OnCharacteristics(HapOnCharacteristics):
 	def __init__(self, device):
-		state, stateValue = device.state()
+		state, _stateValue = device.state()
 		initialValue = True if state != Device.TURNOFF else False
-		super(OnCharacteristics,self).__init__(initialValue)
+		super(OnCharacteristics, self).__init__(initialValue)
 
 class ProgrammableSwitchEventCharacteristics(HapProgrammableSwitchEventCharacteristics):
 	def __init__(self, device):
-		state, stateValue = device.state()
+		state, _stateValue = device.state()
 		initialValue = True if state != Device.TURNOFF else False
-		super(ProgrammableSwitchEventCharacteristics,self).__init__(initialValue)
-
+		super(ProgrammableSwitchEventCharacteristics, self).__init__(initialValue)

@@ -10,18 +10,24 @@ from SocketServer import TCPServer, ThreadingMixIn
 from threading import Thread
 from urlparse import urlparse, parse_qsl
 
-from HapAccessory import HapAccessory, HapService
-from HapCharacteristics import *
-from HapDeviceAccessory import HapDeviceAccessory
+from .HapAccessory import HapAccessory, HapService
+from .HapCharacteristics import HapCharacteristic, HapCurrentRelativeHumidityCharacteristics, HapCurrentTemperatureCharacteristics
+from .HapDeviceAccessory import HapDeviceAccessory
 import random
 import ed25519
 
 import logging
 import json
 
-__name__ = 'HomeKit'
+__name__ = 'HomeKit'  # pylint: disable=redefined-builtin
 
 class HapConnection(HapHandler):
+	def __init__(self, *args, **kwargs):
+		self.accessories = {}
+		self.hk = None
+		self.query = None
+		HapHandler.__init__(self, *args, **kwargs)
+
 	def finish(self):
 		HapHandler.finish(self)
 		HapConnection.HTTPDServer.lostConnection(self)
@@ -211,10 +217,9 @@ class HapConnection(HapHandler):
 		return False
 
 	def setup(self):
-		self.accessories = {}
 		HapHandler.setup(self)
 		HapConnection.HTTPDServer.newConnection(self)
-		self.hk = HomeKit(HapConnection.HTTPDServer.context)
+		self.hk = HomeKit(HapConnection.HTTPDServer.context)  # pylint: disable=too-many-function-args
 		self.loadAccessories()
 
 	def updateCharacteristicsValues(self, aid, values):
@@ -230,6 +235,7 @@ class HapConnection(HapHandler):
 		if len(eventMsg) > 0:
 			self.sendEncryptedResponse({'characteristics': eventMsg}, protocol='EVENT/1.0')
 
+# pylint: disable=too-few-public-methods
 class ThreadedTCPServer(ThreadingMixIn, TCPServer):
 	daemon_threads = True
 
@@ -252,7 +258,7 @@ class HTTPDServer(object):
 		if conn in self.connections:
 			return
 		self.connections.append(conn)
-		HomeKit(self.context).newConnection(conn)
+		HomeKit(self.context).newConnection(conn)  # pylint: disable=too-many-function-args
 
 	def sh(self):
 		for c in self.connections:
@@ -301,7 +307,8 @@ class HomeKit(Plugin):
 			self.password = '%s-%s-%s' % (pw[0:3], pw[3:5], pw[5:8])
 			self.setConfig('password', self.password)
 
-	def getReactComponents(self):
+	@staticmethod
+	def getReactComponents():
 		return {
 			'homekit': {
 				'title': 'HomeKit',

@@ -1,15 +1,30 @@
 # -*- coding: utf-8 -*-
 
+import colorsys
 from telldus import Device
 
-from HapAccessory import HapAccessory, HapService
-from TelldusCharacteristics import *
+from .HapAccessory import HapAccessory, HapService
+from .HapCharacteristics import \
+	HapBatteryLevelCharacteristics, \
+	HapCharacteristic, \
+	HapChargingStateCharacteristics, \
+	HapHueCharacteristics, \
+	HapSaturationCharacteristics, \
+	HapStatusLowBatteryCharacteristics
+from .TelldusCharacteristics import \
+	BrightnessCharacteristics, \
+	OnCharacteristics, \
+	ProgrammableSwitchEventCharacteristics
 
-import colorsys
 
 class HapDeviceAccessory(HapAccessory):
 	def __init__(self, device):
-		super(HapDeviceAccessory,self).__init__('Unknown', device.typeString(), device.name(), device.id())
+		super(HapDeviceAccessory, self).__init__(
+			'Unknown',
+			device.typeString(),
+			device.name(),
+			device.id()
+		)
 		self.device = device
 		methods = device.methods()
 		if methods & (Device.DIM | Device.RGBW) > 0:
@@ -27,7 +42,7 @@ class HapDeviceAccessory(HapAccessory):
 			service = HapService(HapService.TYPE_SWITCH)
 			service.addCharacteristics(OnCharacteristics(device))
 			self.addService(service)
-		elif methods == 0 and device.isSensor() == False:
+		elif methods == 0 and device.isSensor() is False:
 			# No methods but not sensor. Probably magnet switch or motion sensor
 			service = HapService(HapService.TYPE_STATELESS_PROGRAMMABLE_SWITCH)
 			service.addCharacteristics(ProgrammableSwitchEventCharacteristics(device))
@@ -44,8 +59,8 @@ class HapDeviceAccessory(HapAccessory):
 		# Convert iids to types
 		types = {}
 		for iid in iids:
-			c = self.characteristic(iid)
-			types[c['type']] = c
+			characteristic = self.characteristic(iid)
+			types[characteristic['type']] = characteristic
 		if HapCharacteristic.TYPE_HUE in types or HapCharacteristic.TYPE_SATURATION in types:
 			if HapCharacteristic.TYPE_HUE in types:
 				hue = types[HapCharacteristic.TYPE_HUE].value()
@@ -55,8 +70,8 @@ class HapDeviceAccessory(HapAccessory):
 				saturation = types[HapCharacteristic.TYPE_SATURATION].value()
 			else:
 				saturation = self.characteristic(characteristicType=HapCharacteristic.TYPE_SATURATION).value()
-			r,g,b = colorsys.hsv_to_rgb(hue/360.0, saturation/100.0, 1)
-			color = int('%02X%02X%02X00' % (r*255, g*255, b*255), 16)
+			red, green, blue = colorsys.hsv_to_rgb(hue/360.0, saturation/100.0, 1)
+			color = int('%02X%02X%02X00' % (red*255, green*255, blue*255), 16)
 			self.device.command(Device.RGBW, color, origin='HomeKit')
 		if HapCharacteristic.TYPE_BRIGHTNESS in types:
 			value = types[HapCharacteristic.TYPE_BRIGHTNESS].value()
