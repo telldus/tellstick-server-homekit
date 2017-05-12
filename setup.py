@@ -20,7 +20,7 @@ class buildweb(bdist_egg):
 
 setup(
 	name='HomeKit',
-	version='1.1',
+	version='1.2',
 	icon='homekit.png',
 	color='#fcc201',
 	author='Micke Prag',
