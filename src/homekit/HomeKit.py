@@ -1,30 +1,39 @@
 # -*- coding: utf-8 -*-
 
-from base import Application, Plugin, configuration, implements, ConfigurationDict, ConfigurationNumber, ConfigurationString
+from base import \
+	Application, \
+	Plugin, \
+	configuration, \
+	implements, \
+	ConfigurationDict, ConfigurationNumber, ConfigurationString
 from board import Board
 from telldus import DeviceManager, IDeviceChange, Device
 from telldus.web import IWebReactHandler, ConfigurationReactComponent
-from Bonjour import Bonjour
-from HapHandler import HapHandler
+
+import json
+import logging
+import random
 from SocketServer import TCPServer, ThreadingMixIn
 from threading import Thread
 from urlparse import urlparse, parse_qsl
+from .Bonjour import Bonjour
+from .HapHandler import HapHandler
 
 from .HapAccessory import HapAccessory, HapService
-from .HapCharacteristics import HapCharacteristic, HapCurrentRelativeHumidityCharacteristics, HapCurrentTemperatureCharacteristics
+from .HapCharacteristics import \
+	HapCharacteristic, \
+	HapCurrentRelativeHumidityCharacteristics, \
+	HapCurrentTemperatureCharacteristics
 from .HapDeviceAccessory import HapDeviceAccessory
-import random
 import ed25519
 
-import logging
-import json
 
 __name__ = 'HomeKit'  # pylint: disable=redefined-builtin
 
 class HapConnection(HapHandler):
 	def __init__(self, *args, **kwargs):
 		self.accessories = {}
-		self.hk = None
+		self.homekit = None
 		self.query = None
 		HapHandler.__init__(self, *args, **kwargs)
 
@@ -33,7 +42,7 @@ class HapConnection(HapHandler):
 		HapConnection.HTTPDServer.lostConnection(self)
 
 	def addPairing(self, identifier, publicKey, permissions):
-		return self.hk.addPairing(identifier, publicKey, permissions)
+		return self.homekit.addPairing(identifier, publicKey, permissions)
 
 	def deviceAdded(self, device):
 		if len(self.accessories) >= 100:
@@ -49,8 +58,8 @@ class HapConnection(HapHandler):
 			# initially
 			values = device.sensorValues()
 			for valueType in values:
-				for v in values[valueType]:
-					self.sensorValueUpdated(device, valueType, v['value'], v['scale'])
+				for value in values[valueType]:
+					self.sensorValueUpdated(device, valueType, value['value'], value['scale'])
 
 	def deviceRemoved(self, deviceId):
 		aid = deviceId + 1
@@ -84,7 +93,10 @@ class HapConnection(HapHandler):
 		logging.warning('Encrypted GET to %s', self.path)
 		url = urlparse(self.path)
 		if url.path == '/accessories':
-			accessories = [{'aid': i, 'services': self.accessories[i].servicesJSON()} for i in self.accessories]
+			accessories = [
+				{'aid': i, 'services': self.accessories[i].servicesJSON()}
+				for i in self.accessories
+			]
 			self.sendEncryptedResponse({'accessories': accessories})
 		elif url.path == '/characteristics':
 			self.query = dict(parse_qsl(url.query))
@@ -102,9 +114,9 @@ class HapConnection(HapHandler):
 			return retval
 		for i in self.accessories[aid].services:
 			service = self.accessories[aid].services[i]
-			c = service.characteristic(characteristicType=characteristicType)
-			if c is not None:
-				retval.append(c)
+			characteristic = service.characteristic(characteristicType=characteristicType)
+			if characteristic is not None:
+				retval.append(characteristic)
 		return retval
 
 	def handleCharacteristicsGet(self):
@@ -134,20 +146,20 @@ class HapConnection(HapHandler):
 			# TODO: Check if the parameters meta, perms, type and/or ev was requested and return those too
 			retval.append(data)
 		if errorFound:
-			for c in retval:
-				if 'status' not in c:
-					c['status'] = 0
+			for data in retval:
+				if 'status' not in data:
+					data['status'] = 0
 		self.sendEncryptedResponse({'characteristics': retval})
 
 	def handleCharacteristicsPut(self, body):
 		if 'characteristics' not in body:
 			return
 		updatedAids = {}
-		for c in body['characteristics']:
-			if 'aid' not in c or 'iid' not in c:
+		for char in body['characteristics']:
+			if 'aid' not in char or 'iid' not in char:
 				continue
-			aid = int(c['aid'])
-			iid = int(c['iid'])
+			aid = int(char['aid'])
+			iid = int(char['iid'])
 			if aid not in self.accessories:
 				logging.warning("Could not find accessory %s in %s", aid, self.accessories)
 				continue
@@ -155,11 +167,11 @@ class HapConnection(HapHandler):
 			if not characteristic:
 				logging.error("Could not find characteristic")
 				return
-			if 'value' in c:
-				characteristic.setValue(c['value'])
+			if 'value' in char:
+				characteristic.setValue(char['value'])
 				updatedAids.setdefault(aid, []).append(iid)
-			if 'ev' in c:
-				characteristic['ev'] = c['ev']
+			if 'ev' in char:
+				characteristic['ev'] = char['ev']
 		self.sendEncryptedResponse('', '204 No Content')
 		for aid in updatedAids:
 			self.accessories[aid].characteristicsWasUpdated(updatedAids[aid])
@@ -173,11 +185,11 @@ class HapConnection(HapHandler):
 			self.deviceAdded(device)
 
 	def removePairing(self, identifier):
-		return self.hk.removePairing(identifier)
+		return self.homekit.removePairing(identifier)
 
 	def retrievePairings(self):
 		retval = []
-		clients = self.hk.clients
+		clients = self.homekit.clients
 		for identifier in clients:
 			retval.append({
 				'identifier': identifier,
@@ -203,8 +215,8 @@ class HapConnection(HapHandler):
 			serviceType = HapService.TYPE_HUMIDITY_SENSOR
 		else:
 			return
-		c = self.findCharacteristicsByType(aid, characteristicType)
-		if len(c) == 0:
+		characteristic = self.findCharacteristicsByType(aid, characteristicType)
+		if len(characteristic) == 0:
 			accessory = self.accessories[aid]
 			service = HapService(serviceType)
 			service.addCharacteristics(cObject(value))
@@ -219,19 +231,19 @@ class HapConnection(HapHandler):
 	def setup(self):
 		HapHandler.setup(self)
 		HapConnection.HTTPDServer.newConnection(self)
-		self.hk = HomeKit(HapConnection.HTTPDServer.context)  # pylint: disable=too-many-function-args
+		self.homekit = HomeKit(HapConnection.HTTPDServer.context)  # pylint: disable=too-many-function-args
 		self.loadAccessories()
 
 	def updateCharacteristicsValues(self, aid, values):
 		eventMsg = []
 		for characteristicType in values:
-			for c in self.findCharacteristicsByType(aid, characteristicType):
+			for characteristic in self.findCharacteristicsByType(aid, characteristicType):
 				value = values[characteristicType]
-				if value == c.value():
+				if value == characteristic.value():
 					continue
-				c.setValue(value)
-				if c['ev'] == True:
-					eventMsg.append({'aid': aid, 'iid': c['iid'], 'value': c.value()})
+				characteristic.setValue(value)
+				if characteristic['ev'] is True:
+					eventMsg.append({'aid': aid, 'iid': characteristic['iid'], 'value': characteristic.value()})
 		if len(eventMsg) > 0:
 			self.sendEncryptedResponse({'characteristics': eventMsg}, protocol='EVENT/1.0')
 
@@ -248,7 +260,7 @@ class HTTPDServer(object):
 		self.thread = Thread(target=self.httpServer.serve_forever, name='HomeKit http server')
 		self.thread.daemon = True
 		self.thread.start()
-		Application().registerShutdown(self.sh)
+		Application().registerShutdown(self.shutdown)
 
 	def lostConnection(self, conn):
 		if conn in self.connections:
@@ -260,31 +272,36 @@ class HTTPDServer(object):
 		self.connections.append(conn)
 		HomeKit(self.context).newConnection(conn)  # pylint: disable=too-many-function-args
 
-	def sh(self):
-		for c in self.connections:
-			c.close_connection = 1
+	def shutdown(self):
+		for conn in self.connections:
+			conn.close_connection = 1
 		self.httpServer.shutdown()
 		self.httpServer.server_close()
 		logging.warning("Server was shut down")
 
 class HapBridgeAccessory(HapAccessory):
 	def __init__(self):
-		super(HapBridgeAccessory,self).__init__('Telldus Technologies', Board.product(), 'TellStick', HapHandler.getId())
+		super(HapBridgeAccessory, self).__init__(
+			'Telldus Technologies',
+			Board.product(),
+			'TellStick',
+			HapHandler.getId()
+		)
 
 @configuration(
-	password = ConfigurationReactComponent(
+	password=ConfigurationReactComponent(
 		component='homekit',
 		defaultValue=None,
 		writable=False,
 	),
-	clients = ConfigurationDict(
+	clients=ConfigurationDict(
 		hidden=True,
 	),
-	configurationNumber = ConfigurationNumber(
+	configurationNumber=ConfigurationNumber(
 		defaultValue=1,
 		hidden=True,
 	),
-	longTermKey = ConfigurationString(
+	longTermKey=ConfigurationString(
 		defaultValue='',
 		readable=False,
 		hidden=True,
@@ -296,6 +313,8 @@ class HomeKit(Plugin):
 
 	def __init__(self):
 		self.httpServer = None
+		self.bonjour = None
+		self.port = 0
 		Application().queue(self.start)
 		self.clients = self.config('clients')
 		self.configurationNumber = self.config('configurationNumber')
@@ -303,8 +322,8 @@ class HomeKit(Plugin):
 		self.password = self.config('password')
 		if self.password is None:
 			# Generate password
-			pw = ''.join([str(random.randint(0,9)) for i in range(8)])
-			self.password = '%s-%s-%s' % (pw[0:3], pw[3:5], pw[5:8])
+			code = ''.join([str(random.randint(0, 9)) for _i in range(8)])
+			self.password = '%s-%s-%s' % (code[0:3], code[3:5], code[5:8])
 			self.setConfig('password', self.password)
 
 	@staticmethod
@@ -317,8 +336,8 @@ class HomeKit(Plugin):
 		}
 
 	def start(self):
-		self.port    = random.randint(8000, 8079)
-		sf = 1 if len(self.clients) == 0 else 0
+		self.port = random.randint(8000, 8079)
+		sf = 1 if len(self.clients) == 0 else 0  # pylint: disable=invalid-name
 		self.bonjour = Bonjour(port=self.port, c=self.configurationNumber, sf=sf)
 		self.httpServer = HTTPDServer(port=self.port, context=self.context)
 
@@ -345,7 +364,7 @@ class HomeKit(Plugin):
 	def newConnection(self, conn):
 		if self.longTermKey == '':
 			# No public key, generate
-			signingKey, verifyingKey = ed25519.create_keypair()
+			signingKey, _verifyingKey = ed25519.create_keypair()
 			self.longTermKey = signingKey.to_ascii(encoding='hex')
 			self.setConfig('longTermKey', self.longTermKey)
 		conn.setLongTermKey(self.longTermKey, self.password)
