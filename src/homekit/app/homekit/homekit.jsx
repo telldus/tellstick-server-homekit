@@ -5,14 +5,13 @@ function(React, ReactMDL) {
 		render() {
 			return (
 				<div style={{position: 'relative'}}>
+					<link rel="stylesheet" type="text/css" href="/homekit/stylesheet.css" />
 					<img src="/homekit/code.png" />
-					<tt style={{
+					<div style={{
 						position: 'absolute',
-						left: '133px',
-						top: '38px',
-						fontSize: '30px',
-						color: '#000'
-					}}>{this.props.value}</tt>
+						left: '125px',
+						top: '40px',
+					}} className="homekit-code">{this.props.value}</div>
 				</div>
 			)
 		}

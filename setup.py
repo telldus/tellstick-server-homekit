@@ -20,7 +20,7 @@ class BuildWeb(bdist_egg):
 
 setup(
 	name='HomeKit',
-	version='1.2',
+	version='1.2.1',
 	icon='homekit.png',
 	color='#fcc201',
 	author='Micke Prag',
@@ -37,7 +37,13 @@ setup(
 	},
 	extras_require=dict(cREQ='Base>=0.1\nBoard>=0.1\nTelldus>=0.1'),
 	package_data={'homekit' : [
+		'htdocs/*.css',
 		'htdocs/*.js',
+		'htdocs/*.eot',
+		'htdocs/*.svg',
+		'htdocs/*.ttf',
+		'htdocs/*.woff',
+		'htdocs/*.woff2',
 		'htdocs/*.png',
 	]}
 

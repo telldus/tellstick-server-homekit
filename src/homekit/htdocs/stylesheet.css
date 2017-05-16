@@ -1,0 +1,19 @@
+@font-face {
+	font-family: 'HomeKit';
+	src: url('/homekit/codefont.eot');
+	src: url('/homekit/codefont.eot?#iefix') format('embedded-opentype'),
+		url('/homekit/codefont.woff2') format('woff2'),
+		url('/homekit/codefont.woff') format('woff'),
+		url('/homekit/codefont.ttf') format('truetype'),
+		url('/homekit/codefont.svg#Codefont') format('svg');
+	font-weight: 500;
+	font-style: normal;
+}
+
+.homekit-code {
+	font-family: 'HomeKit';
+	font-weight: 500;
+	font-style: normal;
+	font-size: 35px;
+	color: #000;
+}
