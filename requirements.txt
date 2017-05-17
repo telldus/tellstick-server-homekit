@@ -1,4 +1,4 @@
 curve25519-donna
 ed25519
 http-parser
-pybonjour
+file:../tellstick-server-homekit/pybonjour-1.1.1.tar.gz#egg=pybonjour
