@@ -1,14 +1,15 @@
 # -*- coding: utf-8 -*-
 
-from board import Board
-from threading import Thread
 import fcntl
-import pybonjour
+import logging
 import select
 import socket
 import struct
+from threading import Thread
 
-import logging
+import pybonjour
+
+from board import Board
 
 class Bonjour(object):
 	def __init__(self, port, c, sf):
@@ -23,11 +24,12 @@ class Bonjour(object):
 			'md': Board.product(),
 			'ci': '2'
 		}
+		self.sdRef = None
 		self.thread = Thread(target=self.run, name='Bonjour')
 		self.thread.daemon = True
 		self.thread.start()
 
-	def register(self, sdRef, flags, errorCode, name, regtype, domain):
+	def register(self, __sdRef, __flags, errorCode, name, regtype, domain):
 		if errorCode == pybonjour.kDNSServiceErr_NoError:
 			logging.info('Bonjour registered:')
 			logging.info('  name    = %s', name)
@@ -37,11 +39,12 @@ class Bonjour(object):
 
 	def run(self):
 		name = 'TellStick'  # TODO
-		self.sdRef = pybonjour.DNSServiceRegister(name = name,
-			regtype = '_hap._tcp',
-			port = self.port,
-			txtRecord = pybonjour.TXTRecord(self.txt),
-			callBack = self.register
+		self.sdRef = pybonjour.DNSServiceRegister(
+			name=name,
+			regtype='_hap._tcp',
+			port=self.port,
+			txtRecord=pybonjour.TXTRecord(self.txt),
+			callBack=self.register
 		)
 		try:
 			while True:
@@ -58,6 +61,6 @@ class Bonjour(object):
 
 	@staticmethod
 	def getMacAddr(ifname):
-		s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-		info = fcntl.ioctl(s.fileno(), 0x8927,  struct.pack('256s', ifname[:15]))
+		sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+		info = fcntl.ioctl(sock.fileno(), 0x8927, struct.pack('256s', ifname[:15]))
 		return ':'.join(['%02X' % ord(char) for char in info[18:24]])
