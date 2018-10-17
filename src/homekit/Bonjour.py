@@ -1,13 +1,11 @@
 # -*- coding: utf-8 -*-
 
-import fcntl
 import logging
 import select
-import socket
-import struct
 from threading import Thread
 
 import pybonjour
+import netifaces
 
 from board import Board
 
@@ -61,6 +59,9 @@ class Bonjour(object):
 
 	@staticmethod
 	def getMacAddr(ifname):
-		sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-		info = fcntl.ioctl(sock.fileno(), 0x8927, struct.pack('256s', ifname[:15]))
-		return ':'.join(['%02X' % ord(char) for char in info[18:24]])
+		addrs = netifaces.ifaddresses(ifname)
+		try:
+			mac = addrs[netifaces.AF_LINK][0]['addr']
+		except (IndexError, KeyError) as __error:
+			return ''
+		return mac

@@ -575,6 +575,9 @@ class HapHandler(SimpleHTTPRequestHandler):
 	@staticmethod
 	def getId():
 		ifname = Board.networkInterface()
-		s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-		info = fcntl.ioctl(s.fileno(), 0x8927,  struct.pack('256s', ifname[:15]))
-		return ':'.join(['%02X' % ord(char) for char in info[18:24]])
+		addrs = netifaces.ifaddresses(ifname)
+		try:
+			mac = addrs[netifaces.AF_LINK][0]['addr']
+		except (IndexError, KeyError) as __error:
+			return ''
+		return str(mac)
