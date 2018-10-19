@@ -1,5 +1,14 @@
 # -*- coding: utf-8 -*-
 
+import json
+import logging
+import random
+from SocketServer import TCPServer, ThreadingMixIn
+from threading import Thread
+from urlparse import urlparse, parse_qsl
+
+import ed25519
+
 from base import \
 	Application, \
 	Plugin, \
@@ -10,22 +19,14 @@ from board import Board
 from telldus import DeviceManager, IDeviceChange, Device
 from telldus.web import IWebReactHandler, ConfigurationReactComponent
 
-import json
-import logging
-import random
-from SocketServer import TCPServer, ThreadingMixIn
-from threading import Thread
-from urlparse import urlparse, parse_qsl
 from .Bonjour import Bonjour
 from .HapHandler import HapHandler
-
 from .HapAccessory import HapAccessory, HapService
 from .HapCharacteristics import \
 	HapCharacteristic, \
 	HapCurrentRelativeHumidityCharacteristics, \
 	HapCurrentTemperatureCharacteristics
 from .HapDeviceAccessory import HapDeviceAccessory
-import ed25519
 
 
 __name__ = 'HomeKit'  # pylint: disable=redefined-builtin
