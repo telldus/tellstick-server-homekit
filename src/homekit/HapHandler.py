@@ -1,52 +1,63 @@
 # -*- coding: utf-8 -*-
 
-from board import Board
+import hashlib
+import json
+import logging
+from SimpleHTTPServer import SimpleHTTPRequestHandler
+import socket
+
+import ed25519
+import netifaces
+import curve25519
 from Crypto.Util.number import bytes_to_long, long_to_bytes
 from http_parser.parser import HttpParser
-from SimpleHTTPServer import SimpleHTTPRequestHandler
-import chacha20
-import curve25519
-import ed25519
-import fcntl
-import hashlib
-import hkdf
-import json
-import poly1305
-import srp
-import socket
-import struct
-import tlv
 
-import logging
+from board import Board
 
+from .chacha20 import encrypt_bytes, decrypt_bytes, keysetup
+from .hkdf import Hkdf
+from .poly1305 import poly1305
+from .srp import Server, newVerifier
+from .tlv import pack, unpack
 
+# pylint: disable=R0904,R0902
 class HapHandler(SimpleHTTPRequestHandler):
 	def __init__(self, *args, **kwargs):
 		self.encrypted = False
+		self.close_connection = 0
+		self.command = ''
+		self.parsedRequest = None
+		self.path = ''
 		self.receiveCounter = 0
+		self.request_version = None
+		self.requestline = ''
 		self.sendCounter = 0
 		self.sessionStorage = {}
+		self.srpServer = None
+		self.longTermKey = None
+		self.password = None
+
 		SimpleHTTPRequestHandler.__init__(self, *args, **kwargs)
 
 	def pairSetupStep1(self):
 		username = 'Pair-Setup'
 
-		(self.salt, verifier, bits) = srp.newVerifier(username, self.password, 3072)
-		self.sv = srp.Server(username, self.salt, verifier, bits)
-		self.B = long_to_bytes(self.sv.seed())
+		(salt, verifier, bits) = newVerifier(username, self.password, 3072)
+		self.srpServer = Server(username, salt, verifier, bits)
+		seedBytes = long_to_bytes(self.srpServer.seed())
 
 		self.sendTLVResponse([
 			{'type': 'state', 'length': 1, 'data': 2},
-			{'type': 'public_key', 'length': len(self.B), 'data': self.B},
-			{'type': 'salt', 'length': len(self.salt), 'data': self.salt},
+			{'type': 'public_key', 'length': len(seedBytes), 'data': seedBytes},
+			{'type': 'salt', 'length': len(salt), 'data': salt},
 		])
 
 	def pairSetupStep2(self, tlvData):
-		publicKey = ''.join([chr(x) for x in (tlvData['public_key']['data'])])
-		proof = ''.join([chr(x) for x in (tlvData['proof']['data'])])
+		publicKey = ''.join([chr(x) for x in tlvData['public_key']['data']])
+		proof = ''.join([chr(x) for x in tlvData['proof']['data']])
 
 		# TODO: Handle failure if the password if wrong
-		serverProof = self.sv.proof(bytes_to_long(publicKey), proof)
+		serverProof = self.srpServer.proof(bytes_to_long(publicKey), proof)
 
 		self.sendTLVResponse([
 			{'type': 'state', 'length': 1, 'data': 4},
@@ -59,39 +70,42 @@ class HapHandler(SimpleHTTPRequestHandler):
 		messageData = encryptedData[:-16]
 		authTagData = encryptedData[-16:]
 
-		S_private = self.sv.key()
+		sPrivate = self.srpServer.key()
 
 		encSalt = b'Pair-Setup-Encrypt-Salt'
 
 		encInfo = b'Pair-Setup-Encrypt-Info'
 
-		h = hkdf.Hkdf(encSalt, S_private, hash=hashlib.sha512)
-		outputKey = h.expand(encInfo, length=32)
+		key = Hkdf(encSalt, sPrivate, hash=hashlib.sha512)
+		outputKey = key.expand(encInfo, length=32)
 
 		try:
 			plainText = HapHandler.verifyAndDecrypt(outputKey, 'PS-Msg05', messageData, authTagData) #ok
-		except Exception as e:
-			logging.warning('Verification failed: %s', e)
+		except Exception as error:
+			logging.warning('Verification failed: %s', error)
 			return
 
-		unpackedTLV = tlv.unpack(plainText) #ok
+		unpackedTLV = unpack(plainText)  # tlv
 
 		clientUsername = ''.join([chr(x) for x in unpackedTLV['identifier']['data']])
 		clientLTPK = ''.join([chr(x) for x in unpackedTLV['public_key']['data']])
 		clientProof = ''.join([chr(x) for x in unpackedTLV['signature']['data']])
 
 		hkdfEncKey = outputKey
+		logging.warning("setup step 4")
 		self.pairSetupStep4(clientUsername, clientLTPK, clientProof)
+		logging.warning("setup step 5")
 		self.pairSetupStep5(hkdfEncKey)
+		logging.warning("done")
 
 	def pairSetupStep4(self, clientUsername, clientLTPK, clientProof):
-		S_private = self.sv.key()
+		sPrivate = self.srpServer.key()
 
 		controllerSalt = 'Pair-Setup-Controller-Sign-Salt'
 		controllerInfo = 'Pair-Setup-Controller-Sign-Info'
 
-		h = hkdf.Hkdf(controllerSalt, S_private, hash=hashlib.sha512)
-		outputKey = h.expand(controllerInfo, length=32)
+		key = Hkdf(controllerSalt, sPrivate, hash=hashlib.sha512)
+		outputKey = key.expand(controllerInfo, length=32)
 
 		completeData = outputKey + clientUsername + clientLTPK
 
@@ -101,34 +115,46 @@ class HapHandler(SimpleHTTPRequestHandler):
 
 		try:
 			verifyingKey.verify(clientProof, completeData)
-		except ed25519.BadSignatureError as e:
+		except ed25519.BadSignatureError as error:
 			logging.warning('Could not verify signature in pairSetup step 4')
-			raise e
+			raise error
 
 	def pairSetupStep5(self, hkdfEncKey):
-		S_private = self.sv.key()
+		sPrivate = self.srpServer.key()
 		accessorySalt = 'Pair-Setup-Accessory-Sign-Salt'
 		accessoryInfo = 'Pair-Setup-Accessory-Sign-Info'
 
-		h = hkdf.Hkdf(accessorySalt, S_private, hash=hashlib.sha512)
-		AccessoryX = h.expand(accessoryInfo, length=32)
+		key = Hkdf(accessorySalt, sPrivate, hash=hashlib.sha512)
+		accessoryX = key.expand(accessoryInfo, length=32)
 
 		signingKey = ed25519.SigningKey(self.longTermKey, encoding='hex')
 		verifyingKey = signingKey.get_verifying_key()
 
-		AccessoryLTPK = verifyingKey.to_bytes()
+		accessoryLTPK = verifyingKey.to_bytes()
 
-		AccessoryPairingID = HapHandler.getId()
+		accessoryPairingID = HapHandler.getId()
 
-		material = AccessoryX + AccessoryPairingID + AccessoryLTPK
+		material = accessoryX + accessoryPairingID + accessoryLTPK
 
-		AccessorySignature = signingKey.sign(material)
+		accessorySignature = signingKey.sign(material)
 
 		response = []
-		response.append({'type': 'identifier', 'length': len(AccessoryPairingID), 'data': AccessoryPairingID})
-		response.append({'type': 'public_key', 'length': len(AccessoryLTPK), 'data': AccessoryLTPK})
-		response.append({'type': 'signature', 'length': len(AccessorySignature), 'data': AccessorySignature})
-		output = tlv.pack(response)
+		response.append({
+			'type': 'identifier',
+			'length': len(accessoryPairingID),
+			'data': accessoryPairingID
+		})
+		response.append({
+			'type': 'public_key',
+			'length': len(accessoryLTPK),
+			'data': accessoryLTPK
+		})
+		response.append({
+			'type': 'signature',
+			'length': len(accessorySignature),
+			'data': accessorySignature
+		})
+		output = pack(response)  # tlv
 
 		ciphertext, mac = HapHandler.encryptAndSeal(hkdfEncKey, 'PS-Msg06', [ord(x) for x in output])
 
@@ -143,10 +169,10 @@ class HapHandler(SimpleHTTPRequestHandler):
 	def pairVerifyStep1(self, tlvData):
 		publicKey = tlvData['public_key']['data']
 
-		AccessoryLTSK = ed25519.SigningKey(self.longTermKey, encoding='hex')
-		AccessoryLTPK = AccessoryLTSK.get_verifying_key()
+		accessoryLTSK = ed25519.SigningKey(self.longTermKey, encoding='hex')
+		# accessoryLTPK = accessoryLTSK.get_verifying_key()
 
-		AccessoryPairingID = HapHandler.getId()
+		accessoryPairingID = HapHandler.getId()
 
 		iosDevicePublicKey = curve25519.Public(''.join([chr(x) for x in publicKey]))
 
@@ -159,30 +185,38 @@ class HapHandler(SimpleHTTPRequestHandler):
 		shared = private.get_shared_key(iosDevicePublicKey, hashfunc=lambda x: x)
 
 		# Step 3
-		AccessoryPairingInfo = publicSerialized + AccessoryPairingID + iosDevicePublicKey.serialize()
+		accessoryPairingInfo = publicSerialized + accessoryPairingID + iosDevicePublicKey.serialize()
 
 		# Step 4
-		AccessorySignature = AccessoryLTSK.sign(AccessoryPairingInfo)
+		accessorySignature = accessoryLTSK.sign(accessoryPairingInfo)
 
 		# Step 5
 		response = []
-		response.append({'type': 'identifier', 'length': len(AccessoryPairingID), 'data': AccessoryPairingID})
-		response.append({'type': 'signature', 'length': len(AccessorySignature), 'data': AccessorySignature})
-		subTLV = tlv.pack(response)
+		response.append({
+			'type': 'identifier',
+			'length': len(accessoryPairingID),
+			'data': accessoryPairingID
+		})
+		response.append({
+			'type': 'signature',
+			'length': len(accessorySignature),
+			'data': accessorySignature
+		})
+		subTLV = pack(response)  # tlv
 
 		# Step 6
-		InputKey = shared
-		Salt = 'Pair-Verify-Encrypt-Salt'
-		Info = 'Pair-Verify-Encrypt-Info'
+		inputKey = shared
+		salt = 'Pair-Verify-Encrypt-Salt'
+		info = 'Pair-Verify-Encrypt-Info'
 
-		h = hkdf.Hkdf(Salt, InputKey, hash=hashlib.sha512)
-		sessionKey = h.expand(Info, length=32)
+		key = Hkdf(salt, inputKey, hash=hashlib.sha512)
+		sessionKey = key.expand(info, length=32)
 
-		h = hkdf.Hkdf('Control-Salt', shared, hash=hashlib.sha512)
-		writeKey = h.expand('Control-Write-Encryption-Key', length=32)
+		key = Hkdf('Control-Salt', shared, hash=hashlib.sha512)
+		writeKey = key.expand('Control-Write-Encryption-Key', length=32)
 
-		h = hkdf.Hkdf('Control-Salt', shared, hash=hashlib.sha512)
-		readKey = h.expand('Control-Read-Encryption-Key', length=32)
+		key = Hkdf('Control-Salt', shared, hash=hashlib.sha512)
+		readKey = key.expand('Control-Read-Encryption-Key', length=32)
 
 
 		self.sessionStorage = {
@@ -211,8 +245,13 @@ class HapHandler(SimpleHTTPRequestHandler):
 		authTagData = encryptedData[-16:]
 
 		try:
-			plainText = HapHandler.verifyAndDecrypt(self.sessionStorage['hkdfPairEncKey'], 'PV-Msg03', messageData, authTagData)
-		except Exception as e:
+			plainText = HapHandler.verifyAndDecrypt(
+				self.sessionStorage['hkdfPairEncKey'],
+				'PV-Msg03',
+				messageData,
+				authTagData
+			)
+		except Exception as __error:
 			self.sendTLVResponse([
 				{'type': 'state', 'length': 1, 'data': 4},
 				{'type': 'error', 'length': 1, 'data': 2},
@@ -220,15 +259,15 @@ class HapHandler(SimpleHTTPRequestHandler):
 			return
 
 		# Step 2
-		unpackedTLV = tlv.unpack(plainText)
+		unpackedTLV = unpack(plainText)  # tlv
 
 		# Step 3
 		iOSDevicePairingID = ''.join([chr(x) for x in unpackedTLV['identifier']['data']])
 		iOSDeviceSignature = ''.join([chr(x) for x in unpackedTLV['signature']['data']])
 		pairing = None
-		for p in self.retrievePairings():
-			if iOSDevicePairingID == p['identifier']:
-				pairing = p
+		for storedPairing in self.retrievePairings():
+			if iOSDevicePairingID == storedPairing['identifier']:
+				pairing = storedPairing
 				break
 		if pairing is None:
 			self.sendTLVResponse([
@@ -241,7 +280,9 @@ class HapHandler(SimpleHTTPRequestHandler):
 		self.sessionStorage['admin'] = pairing['permissions']
 
 		# Step 4
-		iOSDeviceInfo = self.sessionStorage['clientPublicKey'] + iOSDevicePairingID + self.sessionStorage['publicKey']
+		iOSDeviceInfo = self.sessionStorage['clientPublicKey'] \
+			+ iOSDevicePairingID \
+			+ self.sessionStorage['publicKey']
 		verifyingKey = ed25519.VerifyingKey(self.sessionStorage['clientLTPK'], encoding='hex')
 		try:
 			verifyingKey.verify(iOSDeviceSignature, iOSDeviceInfo)
@@ -259,11 +300,20 @@ class HapHandler(SimpleHTTPRequestHandler):
 			{'type': 'state', 'length': 1, 'data': 4}
 		])
 
-	def addPairing(self, identifier, publicKey, admin):
+	@staticmethod
+	def addPairing(__identifier, __publicKey, __admin):
+		# Overloaded in HapConnection
 		return False
 
-	def removePairing(self, identifier):
+	@staticmethod
+	def removePairing(__identifier):
+		# Overloaded in HapConnection
 		return False
+
+	@staticmethod
+	def retrievePairings():
+		# Overloaded in HapConnection
+		return []
 
 	def __addPairing(self, tlvData):
 		identifier = ''.join([chr(x) for x in tlvData['identifier']['data']])
@@ -276,7 +326,7 @@ class HapHandler(SimpleHTTPRequestHandler):
 			response.append({'type': 'error', 'length': 1, 'data': 2})
 		elif not self.addPairing(identifier, publicKey, admin):
 			response.append({'type': 'error', 'length': 1, 'data': 1})
-		output = tlv.pack(response)
+		output = pack(response)  # tlv
 
 		self.sendEncryptedResponse(output, contentType='application/pairing+tlv8')
 
@@ -290,25 +340,33 @@ class HapHandler(SimpleHTTPRequestHandler):
 			response.append({'type': 'error', 'length': 1, 'data': 2})
 		elif not self.removePairing(identifier):
 			response.append({'type': 'error', 'length': 1, 'data': 1})
-		output = tlv.pack(response)
+		output = pack(response)  # tlv
 		self.sendEncryptedResponse(output, contentType='application/pairing+tlv8')
 
-	def pairings(self, tlvData):
+	def pairings(self, __tlvData):
 		response = []
 		response.append({'type': 'state', 'length': 1, 'data': 2})
 		for pairing in self.retrievePairings():
 			if len(response) > 1:
 				response.append({'type': 'separator', 'length': 0, 'data': ''})
-			response.append({'type': 'identifier', 'length': len(pairing['identifier']), 'data': str(pairing['identifier'])})
-			response.append({'type': 'public_key', 'length': len(pairing['publicKey']), 'data': str(pairing['publicKey'])})
+			response.append({
+				'type': 'identifier',
+				'length': len(pairing['identifier']),
+				'data': str(pairing['identifier'])
+			})
+			response.append({
+				'type': 'public_key',
+				'length': len(pairing['publicKey']),
+				'data': str(pairing['publicKey'])
+			})
 			response.append({'type': 'permissions', 'length': 1, 'data': pairing['permissions']})
-		output = tlv.pack(response)
+		output = pack(response)  # tlv
 
 		self.sendEncryptedResponse(output, contentType='application/pairing+tlv8')
 
 	def do_encrypted_POST(self):
 		if self.path == '/pairings':
-			tlvData = tlv.unpack(self.parsedRequest)
+			tlvData = unpack(self.parsedRequest)  # tlv
 			if tlvData['method']['data'][0] == 3:
 				self.__addPairing(tlvData)
 			elif tlvData['method']['data'][0] == 4:
@@ -323,7 +381,7 @@ class HapHandler(SimpleHTTPRequestHandler):
 			return
 		length = int(self.headers['Content-Length'])
 		data = self.rfile.read(length)
-		tlvData = tlv.unpack(data)
+		tlvData = unpack(data)  # tlv
 
 		if self.path == '/pair-setup':
 			if tlvData['state']['data'][0] == 1:
@@ -342,7 +400,7 @@ class HapHandler(SimpleHTTPRequestHandler):
 			self.close_connection = 1
 
 	def handle_one_request(self):
-		if self.encrypted == False:
+		if not self.encrypted:
 			# We have not yet started encrypting this stream. Use parent handling
 			SimpleHTTPRequestHandler.handle_one_request(self)
 			return
@@ -356,18 +414,26 @@ class HapHandler(SimpleHTTPRequestHandler):
 				self.close_connection = 1
 				return
 			addData = addData + self.rfile.read(1)
-			length =ord(addData[0]) | ord(addData[1]) << 8
-			ciphertext =[ord(x) for x in self.rfile.read(length)]
+			length = ord(addData[0]) | ord(addData[1]) << 8
+			ciphertext = [ord(x) for x in self.rfile.read(length)]
 			mac = [ord(x) for x in self.rfile.read(16)]
 
 			nonce = []
 			noneVal = self.receiveCounter
-			for i in range(8):
+			for __i in range(8):
 				nonce.append(chr(noneVal & 0xFF))
 				noneVal >>= 8
-			nonce = ''.join(nonce)
+			nonceStr = ''.join(nonce)
 
-			raw_requestline = ''.join([chr(x) for x in HapHandler.verifyAndDecrypt(self.sessionStorage['writeKey'], nonce, ciphertext, mac, addData= [ord(x) for x in addData])])
+			raw_requestline = ''.join([
+				chr(x) for x in HapHandler.verifyAndDecrypt(
+					self.sessionStorage['writeKey'],
+					nonceStr,
+					ciphertext,
+					mac,
+					addData=[ord(x) for x in addData]
+				)
+			])
 			self.receiveCounter = self.receiveCounter + 1
 
 			if len(raw_requestline) > 65536:
@@ -428,9 +494,9 @@ class HapHandler(SimpleHTTPRequestHandler):
 			self.command, self.path, self.request_version = command, path, version
 			self.close_connection = 0  # keepalive
 
-			p = HttpParser()
-			p.execute(raw_requestline, len(raw_requestline))
-			self.parsedRequest = p.recv_body()
+			parser = HttpParser()
+			parser.execute(raw_requestline, len(raw_requestline))
+			self.parsedRequest = parser.recv_body()
 
 			mname = 'do_encrypted_' + self.command
 			if not hasattr(self, mname):
@@ -439,24 +505,24 @@ class HapHandler(SimpleHTTPRequestHandler):
 			method = getattr(self, mname)
 			try:
 				method()
-			except Exception as e:
-				logging.exception(e)
+			except Exception as error:
+				logging.exception(error)
 				self.send_error(500, 'Error during call (%r)' % self.command)
 				return
 			self.wfile.flush()
-		except socket.timeout, e:
+		except socket.timeout, error:
 			# a read or a write timed out.Discard this connection
-			self.log_error('Request timed out: %r', e)
+			self.log_error('Request timed out: %r', error)
 			self.close_connection = 1
 		return
 
 	def output(self, data):
-		for c in data:
-			self.wfile.write(c)
+		for char in data:
+			self.wfile.write(char)
 
 	def sendTLVResponse(self, tlvData):
-		if type(tlvData) is list:
-			output = tlv.pack(tlvData)
+		if isinstance(tlvData, list):
+			output = pack(tlvData)  # tlv
 		else:
 			output = tlvData
 		self.send_response(200)
@@ -467,8 +533,14 @@ class HapHandler(SimpleHTTPRequestHandler):
 		self.output(output)
 
 
-	def sendEncryptedResponse(self, msg, status='200 OK', contentType='application/hap+json', protocol='HTTP/1.1'):
-		if type(msg) is dict:
+	def sendEncryptedResponse(
+		self,
+		msg,
+		status='200 OK',
+		contentType='application/hap+json',
+		protocol='HTTP/1.1'
+	):
+		if isinstance(msg, dict):
 			msg = json.dumps(msg)
 		output = '%s %s\r\nContent-Type: %s\r\nConnection: keep-alive\r\nContent-Length: %i\r\n\r\n%s' % (
 			protocol,
@@ -478,25 +550,30 @@ class HapHandler(SimpleHTTPRequestHandler):
 			msg
 		)
 		while len(output):
-			d = output[:1024]
+			data = output[:1024]
 			output = output[1024:]
-			l = len(d)
-			addData = [l&0xFF, (l>>8)&0xFF]
+			length = len(data)
+			addData = [length&0xFF, (length>>8)&0xFF]
 			nonce = []
 			noneVal = self.sendCounter
-			for i in range(8):
+			for __i in range(8):
 				nonce.append(chr(noneVal & 0xFF))
 				noneVal >>= 8
-			nonce = ''.join(nonce)
-			ciphertext, mac = HapHandler.encryptAndSeal(self.sessionStorage['readKey'], nonce, [ord(x) for x in d], addData=addData)
+			nonceStr = ''.join(nonce)
+			ciphertext, mac = HapHandler.encryptAndSeal(
+				self.sessionStorage['readKey'],
+				nonceStr,
+				[ord(x) for x in data],
+				addData=addData
+			)
 
-			r = addData + ciphertext + mac
-			encryptedRequest = ''.join([chr(x) for x in r])
+			request = addData + ciphertext + mac
+			encryptedRequest = ''.join([chr(x) for x in request])
 			try:
 				self.wfile.write(encryptedRequest)
-			except Exception as e:
+			except Exception as error:
 				logging.error("Error writing to socket")
-				logging.exception(e)
+				logging.exception(error)
 				self.close_connection = 1
 				return
 			self.sendCounter = self.sendCounter + 1
@@ -506,12 +583,12 @@ class HapHandler(SimpleHTTPRequestHandler):
 		self.password = password
 
 	@staticmethod
-	def verifyAndDecrypt(key,nonce,ciphertext,mac,addData=None):
-		ctx = chacha20.keysetup(nonce, key)
+	def verifyAndDecrypt(key, nonce, ciphertext, mac, addData=None):
+		ctx = keysetup(nonce, key)  # chacha20
 		zeros = [0]*64
 
-		poly1305key = chacha20.encrypt_bytes(ctx, zeros, len(zeros))
-		poly1305ctx = poly1305.poly1305(poly1305key)
+		poly1305key = encrypt_bytes(ctx, zeros, len(zeros))  # chacha20
+		poly1305ctx = poly1305(poly1305key)
 
 		addDataLength = 0
 		if addData is not None:
@@ -526,28 +603,28 @@ class HapHandler(SimpleHTTPRequestHandler):
 		if length % 16 != 0:
 			poly1305ctx.update([0] * (16-(len(ciphertext)%16)))
 
-		for i in range(8):
+		for __i in range(8):
 			poly1305ctx.update([addDataLength & 0xFF])
 			addDataLength >>= 8
-		for i in range(8):
+		for __i in range(8):
 			poly1305ctx.update([length & 0xFF])
 			length >>= 8
 
-		p = poly1305ctx.finish()
-		if p != mac:
+		poly = poly1305ctx.finish()
+		if poly != mac:
 			raise Exception('Verification failed')
 
-		return chacha20.decrypt_bytes(ctx, ciphertext, len(ciphertext))
+		return decrypt_bytes(ctx, ciphertext, len(ciphertext))  # chacha20
 
 	@staticmethod
 	def encryptAndSeal(key, nonce, plaintext, addData=None):
-		ctx = chacha20.keysetup(nonce, key)
+		ctx = keysetup(nonce, key)
 		zeros = [0]*64
 
-		poly1305key = chacha20.encrypt_bytes(ctx, zeros, len(zeros))
-		poly1305ctx = poly1305.poly1305(poly1305key)
+		poly1305key = encrypt_bytes(ctx, zeros, len(zeros))
+		poly1305ctx = poly1305(poly1305key)
 
-		ciphertext = chacha20.encrypt_bytes(ctx, plaintext, len(plaintext))
+		ciphertext = encrypt_bytes(ctx, plaintext, len(plaintext))
 
 		addDataLength = 0
 		if addData is not None:
@@ -561,10 +638,10 @@ class HapHandler(SimpleHTTPRequestHandler):
 		if len(ciphertext) % 16 != 0:
 			poly1305ctx.update([0] * (16-(len(ciphertext)%16)))
 
-		for i in range(8):
+		for __i in range(8):
 			poly1305ctx.update([addDataLength & 0xFF])
 			addDataLength >>= 8
-		for i in range(8):
+		for __i in range(8):
 			poly1305ctx.update([length & 0xFF])
 			length >>= 8
 
